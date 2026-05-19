@@ -52,6 +52,7 @@ export const groups: Record<string, GroupConfig> = {
       "joschi64@mailbox.org",
       "utsavanand2@gmail.com",
       "gualter@ecobytes.net",
+      "dc7590@gmail.com",
     ],
     scopes: ["user:email", "repo", "read:org", "workflow", "gist"],
     app: {
