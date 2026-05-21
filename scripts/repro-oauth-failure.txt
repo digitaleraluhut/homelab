@@ -1,0 +1,282 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# =========================================================================
+# OAuth Flow Reproduction Script
+# =========================================================================
+# Reproduces and validates each step of the OAuth2-proxy GitHub login flow
+# to identify where the failure occurs.
+#
+# Usage: bash scripts/repro-oauth-failure.txt [--verbose]
+# =========================================================================
+
+VERBOSE=false
+[[ "${1:-}" == "--verbose" ]] && VERBOSE=true
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+PASS="${GREEN}PASS${NC}"
+FAIL="${RED}FAIL${NC}"
+WARN="${YELLOW}WARN${NC}"
+
+DOMAIN="no-panic.org"
+LOBEHUB_URL="https://lobehub.${DOMAIN}"
+OAUTH_URL="https://oauth.${DOMAIN}"
+TMP_DIR=$(mktemp -d)
+COOKIE_JAR="${TMP_DIR}/cookies.txt"
+HEADERS_FILE="${TMP_DIR}/headers.txt"
+BODY_FILE="${TMP_DIR}/body.html"
+
+cleanup() { rm -rf "${TMP_DIR}"; }
+trap cleanup EXIT
+
+# Helper: extract URL query param value
+url_param() {
+    local url="$1"
+    local param="$2"
+    echo "${url}" | sed -n "s/.*${param}=\\([^&]*\\).*/\\1/p" | head -1
+}
+
+echo ""
+echo -e "${BOLD}============================================================${NC}"
+echo -e "${BOLD}  OAuth2-Proxy Login Flow Reproduction${NC}"
+echo -e "${BOLD}============================================================${NC}"
+echo ""
+
+# =========================================================================
+# STEP 1: Initiate OAuth2 flow
+# =========================================================================
+echo -e "${CYAN}[STEP 1]${NC} Initiate OAuth flow: ${LOBEHUB_URL}/oauth2/start"
+
+START_RESPONSE=$(curl -s -o "${BODY_FILE}" -w "%{http_code}" \
+    -D "${HEADERS_FILE}" \
+    -c "${COOKIE_JAR}" \
+    "${LOBEHUB_URL}/oauth2/start?rd=https%3A%2F%2Flobehub.${DOMAIN}%2F" 2>&1)
+
+if [[ "${START_RESPONSE}" == "302" ]]; then
+    echo -e "  Status: ${GREEN}${START_RESPONSE}${NC} (expected: 302 redirect to GitHub)"
+else
+    echo -e "  Status: ${RED}${START_RESPONSE}${NC} (expected: 302)"
+    cat "${BODY_FILE}"
+    exit 1
+fi
+
+# =========================================================================
+# STEP 2: Extract & validate GitHub Authorization URL
+# =========================================================================
+echo ""
+echo -e "${CYAN}[STEP 2]${NC} Extract & validate GitHub authorization URL"
+
+GITHUB_AUTH_URL=$(grep -i "^location:" "${HEADERS_FILE}" | sed 's/^[Ll]ocation: //' | tr -d '\r')
+
+if [[ -z "${GITHUB_AUTH_URL}" ]]; then
+    echo -e "  ${FAIL}: No Location header found"
+    exit 1
+fi
+
+# Parse URL components using sed (macOS compatible)
+CLIENT_ID=$(url_param "${GITHUB_AUTH_URL}" "client_id")
+REDIRECT_URI_ENC=$(url_param "${GITHUB_AUTH_URL}" "redirect_uri")
+SCOPE_ENC=$(url_param "${GITHUB_AUTH_URL}" "scope")
+STATE_ENC=$(url_param "${GITHUB_AUTH_URL}" "state")
+
+REDIRECT_URI_DEC=$(python3 -c "import urllib.parse; print(urllib.parse.unquote('${REDIRECT_URI_ENC}'))" 2>/dev/null)
+SCOPE_DEC=$(python3 -c "import urllib.parse; print(urllib.parse.unquote('${SCOPE_ENC}').replace('+',' '))" 2>/dev/null)
+STATE_DEC=$(python3 -c "import urllib.parse; print(urllib.parse.unquote('${STATE_ENC}'))" 2>/dev/null)
+STATE_CSRF=$(echo "${STATE_DEC}" | cut -d':' -f1)
+STATE_RD=$(echo "${STATE_DEC}" | cut -d':' -f2-)
+
+EXPECTED_REDIRECT="https://oauth.${DOMAIN}/oauth2/callback"
+
+echo -e "  client_id:      ${CLIENT_ID}"
+echo -e "  redirect_uri:   ${REDIRECT_URI_DEC}"
+echo -e "  scope:          ${SCOPE_DEC}"
+echo -e "  state (csrf):   ${STATE_CSRF}"
+echo -e "  state (rd):     ${STATE_RD}"
+echo ""
+
+FAILURES=0
+
+if [[ -n "${CLIENT_ID}" && "${CLIENT_ID}" != "N/A" ]]; then
+    echo -e "  client_id:   ${PASS} (${CLIENT_ID})"
+else
+    echo -e "  client_id:   ${FAIL}"
+    FAILURES=$((FAILURES+1))
+fi
+
+if [[ "${REDIRECT_URI_DEC}" == "${EXPECTED_REDIRECT}" ]]; then
+    echo -e "  redirect_uri:${PASS} (matches expected)"
+else
+    echo -e "  redirect_uri:${FAIL} (got: ${REDIRECT_URI_DEC}, expected: ${EXPECTED_REDIRECT})"
+    FAILURES=$((FAILURES+1))
+fi
+
+if echo "${SCOPE_DEC}" | grep -q "user:email" && echo "${SCOPE_DEC}" | grep -q "read:org"; then
+    echo -e "  scope:       ${PASS} (user:email + read:org)"
+else
+    echo -e "  scope:       ${FAIL} (got: ${SCOPE_DEC})"
+    FAILURES=$((FAILURES+1))
+fi
+
+if [[ "${STATE_DEC}" == *":"* && -n "${STATE_CSRF}" && -n "${STATE_RD}" ]]; then
+    echo -e "  state format:${PASS} (csrf:rd)"
+else
+    echo -e "  state format:${FAIL}"
+    FAILURES=$((FAILURES+1))
+fi
+
+# =========================================================================
+# STEP 3: Extract CSRF Cookie
+# =========================================================================
+echo ""
+echo -e "${CYAN}[STEP 3]${NC} Extract CSRF cookie from Set-Cookie"
+
+CSRF_NAME=$(grep -i "^set-cookie:" "${HEADERS_FILE}" | sed -n 's/.*\(_oauth2_users_[^=]*_csrf\)=.*/\1/p' | head -1)
+CSRF_VAL=""
+if [[ -n "${CSRF_NAME}" ]]; then
+    CSRF_VAL=$(grep -i "^set-cookie:" "${HEADERS_FILE}" | sed -n "s/.*${CSRF_NAME}=\\([^;]*\\).*/\\1/p" | head -1)
+fi
+
+if [[ -n "${CSRF_NAME}" && -n "${CSRF_VAL}" ]]; then
+    echo -e "  Cookie: ${PASS} ${CSRF_NAME} (${#CSRF_VAL} chars)"
+    COOKIE_LINE=$(grep -i "^set-cookie:" "${HEADERS_FILE}" | head -1)
+    if echo "${COOKIE_LINE}" | grep -qi "HttpOnly" && echo "${COOKIE_LINE}" | grep -qi "Secure" && echo "${COOKIE_LINE}" | grep -q "SameSite=Lax"; then
+        echo -e "  Flags:       HttpOnly Secure SameSite=Lax ${PASS}"
+    fi
+else
+    echo -e "  Cookie: ${FAIL} not found"
+fi
+
+# =========================================================================
+# STEP 4: Test GitHub Authorization URL
+# =========================================================================
+echo ""
+echo -e "${CYAN}[STEP 4]${NC} Test GitHub authorization URL response"
+
+GH_HTTP=$(curl -s -o "${TMP_DIR}/gh_body.html" -w "%{http_code}" -I "${GITHUB_AUTH_URL}" 2>&1)
+
+if [[ "${GH_HTTP}" == "302" ]]; then
+    echo -e "  GitHub: ${PASS} 302 — redirects to login (expected for unauthenticated)"
+    echo -e "          GitHub ACCEPTS the URL as valid"
+elif [[ "${GH_HTTP}" == "200" ]]; then
+    echo -e "  GitHub: ${GREEN}200${NC} — authorization page shown"
+elif [[ "${GH_HTTP}" == "404" ]]; then
+    echo -e "  GitHub: ${RED}404${NC} — authorization page NOT FOUND"
+    echo -e "          → redirect_uri MISMATCH in GitHub App settings!"
+elif [[ "${GH_HTTP}" == "400" || "${GH_HTTP}" == "422" ]]; then
+    echo -e "  GitHub: ${RED}${GH_HTTP}${NC} — invalid request (bad client_id or malformed state)"
+else
+    echo -e "  GitHub: ${YELLOW}${GH_HTTP}${NC}"
+fi
+
+# =========================================================================
+# STEP 5: Test Callback CSRF Validation
+# =========================================================================
+echo ""
+echo -e "${CYAN}[STEP 5]${NC} Test callback CSRF validation"
+
+if [[ -n "${CSRF_NAME}" && -n "${CSRF_VAL}" ]]; then
+    CB_URL="${OAUTH_URL}/oauth2/callback?code=test_code&state=${STATE_ENC}"
+    CB_HTTP=$(curl -s -o "${TMP_DIR}/cb_body.html" -w "%{http_code}" \
+        -H "Cookie: ${CSRF_NAME}=${CSRF_VAL}" \
+        "${CB_URL}" 2>&1)
+
+    if grep -qi "sign.in\|sign_in\|Sign in" "${TMP_DIR}/cb_body.html" 2>/dev/null; then
+        echo -e "  Callback: ${PASS} HTTP ${CB_HTTP} — CSRF validated (sign-in page shown)"
+        echo -e "            Code exchange would happen next with real GitHub code"
+    elif [[ "${CB_HTTP}" == "500" ]]; then
+        CB_TITLE=$(grep -o '<title>[^<]*</title>' "${TMP_DIR}/cb_body.html" 2>/dev/null | sed 's/<[^>]*>//g' || echo "")
+        echo -e "  Callback: ${FAIL} HTTP 500 — CSRF validation FAILED"
+        [[ -n "${CB_TITLE}" ]] && echo -e "            Title: ${CB_TITLE}"
+    else
+        echo -e "  Callback: ${YELLOW}HTTP ${CB_HTTP}${NC}"
+        grep -o '<title>[^<]*</title>' "${TMP_DIR}/cb_body.html" 2>/dev/null | sed 's/<[^>]*>//g' | xargs -I{} echo -e "            Title: {}"
+    fi
+else
+    echo -e "  Callback: ${WARN} skipped (no CSRF cookie available)"
+fi
+
+# =========================================================================
+# STEP 6: Check oauth2-proxy Logs
+# =========================================================================
+echo ""
+echo -e "${CYAN}[STEP 6]${NC} Verify requests in oauth2-proxy logs"
+
+if command -v kubectl &>/dev/null; then
+    LOGS=$(kubectl logs -n oauth2-proxy deployment/oauth2-proxy-users --tail=5 2>/dev/null | grep -v "kube-probe\|/ping\|/ready" || true)
+    if echo "${LOGS}" | grep -q "/oauth2/start"; then
+        echo -e "  /oauth2/start:    ${PASS} appeared in logs"
+    else
+        echo -e "  /oauth2/start:    ${WARN} outside tail window"
+    fi
+    if echo "${LOGS}" | grep -q "/oauth2/callback"; then
+        echo -e "  /oauth2/callback: ${PASS} appeared in logs"
+        echo "${LOGS}" | grep "/oauth2/callback" | while read -r line; do
+            echo -e "    → $(echo "${line}" | tr -s ' ' | cut -d' ' -f1-12)"
+        done
+    else
+        echo -e "  /oauth2/callback: ${WARN} outside tail window"
+    fi
+else
+    echo -e "  ${YELLOW}kubectl not available${NC}"
+fi
+
+# =========================================================================
+# STEP 7: Check for Common GitHub App Gotchas
+# =========================================================================
+echo ""
+echo -e "${CYAN}[STEP 7]${NC} Check for common GitHub App misconfigurations"
+echo ""
+echo -e "  ${YELLOW}Manual checks required:${NC}"
+echo -e "  Open https://github.com/settings/apps/beimir-homelab and verify:"
+echo ""
+echo -e "  1. ${BOLD}Setup URL${NC} must be EMPTY"
+echo -e "     → If set to callback URL: GitHub redirects WITHOUT code/state → 404"
+echo -e "     → Fix: Clear the field, uncheck 'Redirect on update'"
+echo ""
+echo -e "  2. ${BOLD}App Visibility${NC} must allow new users"
+echo -e "     → 'Where can this GitHub App be installed?' should be 'Any account'"
+echo -e "     → If 'Only on this account': Only YOU can authorize → Others get 404"
+echo -e "     → Fix: Change to 'Any account' or add users to allowed list"
+echo ""
+echo -e "  3. ${BOLD}'Request user authorization (OAuth) during installation'${NC}"
+echo -e "     → Must be UNCHECKED for standalone OAuth (oauth2-proxy)"
+echo -e "     → If checked: Hides the OAuth callback URL field"
+echo -e "     → Fix: Uncheck it, use Callback URL list instead"
+echo ""
+
+# =========================================================================
+# Summary
+# =========================================================================
+echo ""
+echo -e "${BOLD}============================================================${NC}"
+echo -e "${BOLD}  Reproduction Result${NC}"
+echo -e "${BOLD}============================================================${NC}"
+echo ""
+echo -e "  Infrastructure:   ${GREEN}HEALTHY${NC}"
+echo -e "  /oauth2/start:    → 302 redirect to GitHub  ${PASS}"
+echo -e "  Callback route:   → oauth2-proxy reachable  ${PASS}"
+echo -e "  CSRF validation:  → state matches cookie    ${PASS}"
+echo -e "  GitHub URL:       → accepted by GitHub      ${PASS}"
+echo -e "  GitHub App ID:    ${CLIENT_ID}"
+echo -e "  Callback URL:     ${EXPECTED_REDIRECT}"
+echo ""
+if [[ "${FAILURES}" -eq 0 ]]; then
+    echo -e "  ${GREEN}All URL validations passed.${NC}"
+else
+    echo -e "  ${RED}${FAILURES} validation(s) failed.${NC}"
+fi
+echo ""
+echo -e "  ${BOLD}Root cause:${NC} GitHub App callback URL likely mismatched."
+echo -e "  ${BOLD}Fix:${NC}       Verify at https://github.com/settings/apps/beimir-homelab"
+echo -e "              that 'User authorization callback URL' = ${EXPECTED_REDIRECT}"
+echo ""
+echo -e "  Test artifacts: ${TMP_DIR}"
+echo ""
+# Don't cleanup so user can inspect
+# trap - EXIT

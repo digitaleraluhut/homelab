@@ -43,7 +43,7 @@ export interface GroupConfig {
 
 export const groups: Record<string, GroupConfig> = {
   users: {
-    emails: ["github@beimir.net", "dirk.oberhaus@gmx.de"],
+    emails: ["github@beimir.net", "dirk.oberhaus@gmx.de", "github.noah@beimir.net"],
   },
   developers: {
     emails: [

@@ -318,6 +318,45 @@ kubectl get pods -n oauth2-proxy -w
 kubectl rollout restart deployment/oauth2-proxy-users -n oauth2-proxy
 ```
 
+### Gotcha: GitHub App "Setup URL" Breaks OAuth
+
+**Symptom**: User authorizes on GitHub but never returns to callback URL. No `/oauth2/callback` entries in oauth2-proxy logs. User sees 404 or error page.
+
+**Root Cause**: GitHub App "Setup URL" is set to the OAuth callback URL (`https://oauth.no-panic.org/oauth2/callback`) AND "Redirect on update" is checked. After authorization, GitHub redirects to the Setup URL **without** `code`/`state` params → oauth2-proxy rejects the request.
+
+**Fix**:
+1. Go to GitHub App settings → Clear "Setup URL" field
+2. Uncheck "Redirect on update"
+3. Save changes
+
+**Why this happens**: Setup URL is for post-installation configuration (e.g., onboarding wizard), NOT for OAuth callbacks. GitHub sends a `setup_action=install` parameter instead of OAuth `code`/`state`.
+
+### Gotcha: GitHub App Visibility Restricts Who Can Authorize
+
+**Symptom**: App owner can log in, but new users get 404 from GitHub on the authorization page. The `/oauth2/start` redirect works, but GitHub shows "Not Found" before showing the authorization screen.
+
+**Root Cause**: GitHub App is configured as "Internal" (org-only) or "Private" instead of "Public". Only the app owner or org members can authorize it.
+
+**Fix** (choose one):
+1. **Make app Public**: GitHub App settings → "Where can this GitHub App be installed?" → "Any account"
+2. **Add users to org**: Invite users to the organization that owns the app
+3. **Add allowed users**: GitHub App settings → "Install" → manage allowed users
+
+**Verification**: Check if new users can see the app at `https://github.com/apps/beimir-homelab` when logged out. If it 404s for them, it's restricted.
+
+### Gotcha: "Request User Authorization During Installation" Locks OAuth
+
+**Symptom**: No "User authorization callback URL" field visible in GitHub App settings. OAuth flow fails with "redirect_uri mismatch" or no callback generated.
+
+**Root Cause**: "Request user authorization (OAuth) during installation" is enabled. This hides the standalone OAuth callback URL field because GitHub assumes you're using the installation flow, not standalone OAuth.
+
+**Fix**:
+1. Disable "Request user authorization (OAuth) during installation"
+2. The "Callback URL" list becomes the source of truth for OAuth redirects
+3. Ensure `https://oauth.no-panic.org/oauth2/callback` is in the Callback URL list
+
+**Note**: oauth2-proxy uses standalone OAuth (`/login/oauth/authorize`), NOT the installation flow. These are mutually exclusive configurations.
+
 ## Related Files
 
 - `packages/core/infrastructure/src/traefik-gateway/index.ts` - Traefik configuration
