@@ -14,9 +14,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/pulumi-config.enc.yaml"
 SOPS="$(which sops)"
-TEMP_CONFIG=$(mktemp)
 TEMP_KEY=$(mktemp)
-trap "rm -f $TEMP_CONFIG $TEMP_KEY" EXIT
+trap "rm -f $TEMP_KEY" EXIT
 
 STACK_NAME="${1:-.}"
 
@@ -74,12 +73,9 @@ echo ""
 echo "Target stack: $STACK_NAME"
 echo ""
 
-# Decrypt config
-echo "Decrypting configuration..."
-"$SOPS" -d "$CONFIG_FILE" > "$TEMP_CONFIG"
-
 # Parse YAML and restore to Pulumi
-echo "Restoring configuration to Pulumi..."
+# Decrypted config is piped via stdin — never written to disk.
+echo "Decrypting and restoring configuration to Pulumi..."
 echo "Note: ESC environments require 'pulumi env edit' permissions"
 OVERRIDE_SECRETS_JSON=$(for key in "${!OVERRIDE_SECRETS[@]}"; do echo "\"$key\": \"${OVERRIDE_SECRETS[$key]}\""; done | paste -sd, -)
 if [ -z "$OVERRIDE_SECRETS_JSON" ]; then
@@ -88,7 +84,9 @@ else
   OVERRIDE_SECRETS_JSON="{$OVERRIDE_SECRETS_JSON}"
 fi
 
-OVERRIDE_SECRETS_JSON="$OVERRIDE_SECRETS_JSON" TEMP_CONFIG="$TEMP_CONFIG" STACK_NAME="$STACK_NAME" python3 << 'PYTHON'
+# shellcheck disable=SC2016  # expressions in single quotes intentional (python code)
+OVERRIDE_SECRETS_JSON="$OVERRIDE_SECRETS_JSON" STACK_NAME="$STACK_NAME" \
+"$SOPS" -d "$CONFIG_FILE" | python3 -c "$(cat << 'PYTHON'
 import json
 import subprocess
 import sys
@@ -161,10 +159,8 @@ def parse_simple_yaml(content):
     
     return config_data
 
-# Read and parse the config file
-temp_config = os.environ.get('TEMP_CONFIG')
-with open(temp_config, 'r') as f:
-    content = f.read()
+# Read decrypted config from stdin (never touches disk)
+content = sys.stdin.read()
 
 config_data = parse_simple_yaml(content)
 
@@ -220,6 +216,7 @@ else:
     print(f"\n✅ Successfully restored {len(config_data['config'])} config key(s)")
 
 PYTHON
+)"
 
 echo ""
 echo "✅ Configuration restore complete!"
