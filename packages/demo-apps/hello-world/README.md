@@ -33,7 +33,7 @@ Modify `src/index.ts` to:
 Copy this pattern to create new applications:
 
 ```bash
-mkdir -p packages/apps/my-app/src
+mkdir -p packages/demo-apps/my-app/src
 # Copy files from hello-world and customize
 # Update package.json with new name
 npm install

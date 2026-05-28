@@ -53,8 +53,8 @@ homelab/                          ← Pulumi project (root)
     ├── stacks/
     │   └── base-infra/          ← Orchestrates core infrastructure
     │
-    └── apps/
-        └── hello-world/         ← Demo application (extensible pattern)
+    └── demo-apps/
+        └── hello-world/         ← Demo / smoke-test application (extensible pattern)
 ```
 
 ## Key Features
@@ -70,12 +70,12 @@ homelab/                          ← Pulumi project (root)
 ### Recommended: `homelab-apps` monorepo pattern
 
 For real personal apps (e.g. LobeHub, Vaultwarden, Gitea) use the dedicated
-[`mrsimpson/homelab-apps`](https://github.com/mrsimpson/homelab-apps) monorepo.
+[`digitaleraluhut/homelab-apps`](https://github.com/digitaleraluhut/homelab-apps) monorepo.
 
 **Why a separate repo?**
 - One repo → one secret set (`KUBECONFIG`, `PULUMI_ACCESS_TOKEN`, Tailscale OAuth)
 - No need to fork upstream projects just to carry deployment code
-- Clean separation: this repo is the *framework*, `homelab-apps` is *your apps*
+- Clean separation: this repo is the *framework* and contains *demo/smoke-test apps*, `homelab-apps` is *your real apps*
 
 **Structure:**
 ```
@@ -95,14 +95,14 @@ homelab-apps/
 ./scripts/setup-homelab-apps.sh
 ```
 
-**Adding a new app:** Use the **`deploy-homelab-app` skill** in [`homelab-apps/skills/`](https://github.com/mrsimpson/homelab-apps/tree/main/skills/deploy-homelab-app/SKILL.md) — load it in your AI agent and say *"add a new app to homelab-apps"*. It covers workspace scaffolding, RBAC setup, CI workflow, and security considerations.
+**Adding a new app:** Use the **`deploy-homelab-app` skill** in [`homelab-apps/skills/`](https://github.com/digitaleraluhut/homelab-apps/tree/main/skills/deploy-homelab-app/SKILL.md) — load it in your AI agent and say *"add a new app to homelab-apps"*. It covers workspace scaffolding, RBAC setup, CI workflow, and security considerations.
 
 ### Demo apps (in this repo)
 
-The `packages/apps/` folder contains lightweight framework examples:
+The `packages/demo-apps/` folder contains lightweight **demo / smoke-test** framework examples:
 
 ```bash
-mkdir -p packages/apps/my-app/src
+mkdir -p packages/demo-apps/my-app/src
 # Create: package.json, tsconfig.json, src/index.ts
 npm install
 ```
@@ -124,7 +124,7 @@ Or extend `packages/core/infrastructure/` for reusable modules.
 
 ## Documentation
 
-- **[homelab-apps skills](https://github.com/mrsimpson/homelab-apps/tree/main/skills/)** - AI agent skills for adding and configuring apps (deploy, database, oauth, secrets)
+- **[homelab-apps skills](https://github.com/digitaleraluhut/homelab-apps/tree/main/skills/)** - AI agent skills for adding and configuring apps (deploy, database, oauth, secrets)
 - **[OAuth2-Proxy Authentication](./docs/OAUTH2_PROXY.md)** - GitHub-based authentication system
 - **[OAuth2-Proxy Examples](./docs/OAUTH2_PROXY_EXAMPLES.md)** - Step-by-step usage examples
 - **[ADRs](./docs/adr/)** - Architecture decisions

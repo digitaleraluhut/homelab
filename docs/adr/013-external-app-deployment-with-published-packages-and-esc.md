@@ -7,7 +7,7 @@
 
 ## Context
 
-The homelab Kubernetes cluster is managed by a single Pulumi monorepo. Applications like `opencode-router` and `opencode-cloudflare-operator` currently have their deployment recipes inside this repo (`packages/apps/`), even though their source code and Docker images are built in separate repositories.
+The homelab Kubernetes cluster is managed by a single Pulumi monorepo. Applications like `opencode-router` and `opencode-cloudflare-operator` originally had their deployment recipes inside this repo (`packages/apps/`, now `packages/demo-apps/` for demo apps), even though their source code and Docker images are built in separate repositories.
 
 This creates a coupling problem: adding, updating, or removing an app always requires changes to the homelab repo. ADR-007 decided on separate repos with published npm packages but left the secrets and configuration strategy undefined. This ADR refines that decision with a concrete implementation plan.
 

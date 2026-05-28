@@ -1,7 +1,7 @@
 {
-  "name": "@mrsimpson/homelab-app-nodejs-demo",
+  "name": "@mrsimpson/homelab-app-hello-world",
   "version": "0.1.0",
-  "description": "Node.js demo app for homelab deployment with private GHCR image",
+  "description": "Demo / smoke-test app: Hello World application for homelab", 
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
@@ -10,13 +10,19 @@
     "format": "biome format --write src/",
     "type-check": "tsc --noEmit"
   },
-  "keywords": ["pulumi", "kubernetes", "homelab", "app", "nodejs", "ghcr", "private-image"],
+  "keywords": [
+    "pulumi",
+    "kubernetes",
+    "homelab",
+    "app",
+    "example"
+  ],
   "author": "mrsimpson",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mrsimpson/homelab.git",
-    "directory": "packages/apps/nodejs-demo"
+    "url": "https://github.com/digitaleraluhut/homelab.git",
+    "directory": "packages/demo-apps/hello-world"
   },
   "engines": {
     "node": ">=24.0.0"

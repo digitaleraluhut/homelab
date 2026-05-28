@@ -1,7 +1,7 @@
 {
   "name": "@mrsimpson/homelab-app-storage-validator",
   "version": "1.0.0",
-  "description": "Simple webapp to validate persistent storage functionality",
+  "description": "Demo / smoke-test app: Simple webapp to validate persistent storage functionality",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -22,6 +22,11 @@
   },
   "author": "mrsimpson",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/digitaleraluhut/homelab.git",
+    "directory": "packages/demo-apps/storage-validator"
+  },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   }

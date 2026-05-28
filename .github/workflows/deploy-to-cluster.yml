@@ -9,7 +9,7 @@ name: Deploy to Homelab Cluster
 # against that project's own last-known state — apps cannot affect each other's resources.
 #
 # External apps are each their own project. They read shared infrastructure (domain,
-# tunnelCname, etc.) via StackReference("mrsimpson/homelab/dev"), but manage their
+# tunnelCname, etc.) via StackReference("digitaleraluhut/homelab/dev"), but manage their
 # own Kubernetes resources in their own isolated state.
 #
 # The KUBECONFIG and Tailscale secrets point to the shared cluster — all apps land
@@ -19,10 +19,10 @@ name: Deploy to Homelab Cluster
 #
 #   jobs:
 #     deploy:
-#       uses: mrsimpson/homelab/.github/workflows/deploy-to-cluster.yml@main
+#       uses: digitaleraluhut/homelab/.github/workflows/deploy-to-cluster.yml@main
 #       with:
-#         # "name:" from the app's Pulumi.yaml — NOT "mrsimpson/homelab/dev"
-#         pulumi-stack: mrsimpson/opencode/dev
+#         # "name:" from the app's Pulumi.yaml — NOT "digitaleraluhut/homelab/dev"
+#         pulumi-stack: digitaleraluhut/opencode/dev
 #         working-directory: deployment/homelab   # path to the folder with Pulumi.yaml
 #       secrets: inherit
 #
@@ -40,11 +40,11 @@ on:
     inputs:
       pulumi-stack:
         description: >
-          Fully qualified Pulumi stack name: "mrsimpson/<project>/<stack>".
+          Fully qualified Pulumi stack name: "digitaleraluhut/<project>/<stack>".
           The project name comes from the "name:" field in the app's own Pulumi.yaml —
-          this must NOT be "mrsimpson/homelab/dev" (that is the base infra stack read
+          this must NOT be "digitaleraluhut/homelab/dev" (that is the base infra stack read
           via StackReference, not the stack being deployed).
-          Example: Pulumi.yaml has "name: opencode" → stack is "mrsimpson/opencode/dev".
+          Example: Pulumi.yaml has "name: opencode" → stack is "digitaleraluhut/opencode/dev".
         type: string
         required: true
 
