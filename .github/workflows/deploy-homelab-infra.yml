@@ -53,6 +53,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build workspace packages
+        run: npm run build --workspaces --if-present
+
       # Join the Tailscale tailnet so we can reach the cluster's Kubernetes API.
       # The runner is registered as an ephemeral device and is automatically
       # removed from the tailnet when the job completes.
