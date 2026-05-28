@@ -84,8 +84,10 @@ else
   OVERRIDE_SECRETS_JSON="{$OVERRIDE_SECRETS_JSON}"
 fi
 
+# Export so both sides of the pipe subshell inherit them
+export OVERRIDE_SECRETS_JSON STACK_NAME
+
 # shellcheck disable=SC2016  # expressions in single quotes intentional (python code)
-OVERRIDE_SECRETS_JSON="$OVERRIDE_SECRETS_JSON" STACK_NAME="$STACK_NAME" \
 "$SOPS" -d "$CONFIG_FILE" | python3 -c "$(cat << 'PYTHON'
 import json
 import subprocess
