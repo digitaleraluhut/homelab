@@ -1,6 +1,6 @@
 # Homelab: Personal Infrastructure as Code
 
-> Own your software. Control your data. Learn real infrastructure.
+> Part of [digitaleraluhut](https://github.com/digitaleraluhut) — the platform layer. Provides the k3s cluster that [homelab-apps](https://github.com/digitaleraluhut/homelab-apps) deploys onto, and the networking that exposes [local-ai](https://github.com/digitaleraluhut/local-ai) endpoints to the internet.
 
 Type-safe Kubernetes homelab with Pulumi. Zero inbound ports via Cloudflare Tunnel. Everything version-controlled.
 
