@@ -81,6 +81,9 @@ jobs:
       - name: Set Pulumi config from secrets
         run: |
           pulumi config set homelab:cloudflareAccountId "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" --stack mrsimpson/homelab/dev
+          pulumi config set homelab:cloudflareZoneId "${{ secrets.CLOUDFLARE_ZONE_ID }}" --stack mrsimpson/homelab/dev
+          pulumi config set homelab:domain "${{ secrets.HOMELAB_DOMAIN }}" --stack mrsimpson/homelab/dev
+          pulumi config set homelab:email "${{ secrets.HOMELAB_EMAIL }}" --stack mrsimpson/homelab/dev
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
 
