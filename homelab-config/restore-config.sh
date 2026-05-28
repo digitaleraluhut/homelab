@@ -6,7 +6,6 @@ set -e
 # Usage: ./restore-config.sh [stack-name] [secret-key=value ...]
 #
 # Examples:
-#   cat ~/.sops-backup/key.age | ./restore-config.sh production
 #   SOPS_AGE_KEY=$(cat ~/.sops-backup/key.age) ./restore-config.sh production
 #   SOPS_AGE_KEY_FILE=~/.sops-backup/key.age ./restore-config.sh production
 #   ./restore-config.sh production cloudflare:apiToken=abc123
@@ -14,8 +13,6 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/pulumi-config.enc.yaml"
 SOPS="$(which sops)"
-TEMP_KEY=$(mktemp)
-trap "rm -f $TEMP_KEY" EXIT
 
 STACK_NAME="${1:-.}"
 
@@ -39,31 +36,23 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # Handle AGE key from multiple sources (in priority order)
-if [ -n "$SOPS_AGE_KEY_FILE" ] && [ -f "$SOPS_AGE_KEY_FILE" ]; then
-    # Key file path provided via environment variable
-    export SOPS_AGE_KEY_FILE="$SOPS_AGE_KEY_FILE"
-elif [ -n "$SOPS_AGE_KEY" ]; then
-    # Key provided directly via environment variable
-    echo "$SOPS_AGE_KEY" > "$TEMP_KEY"
-    chmod 600 "$TEMP_KEY"
-    export SOPS_AGE_KEY_FILE="$TEMP_KEY"
+# sops reads SOPS_AGE_KEY (key content) and SOPS_AGE_KEY_FILE (key path) natively —
+# no temp file needed.
+if [ -n "$SOPS_AGE_KEY" ]; then
+    # Key content provided directly — sops reads this env var natively
+    export SOPS_AGE_KEY
+elif [ -n "$SOPS_AGE_KEY_FILE" ] && [ -f "$SOPS_AGE_KEY_FILE" ]; then
+    # Key file path provided — sops reads this env var natively
+    export SOPS_AGE_KEY_FILE
 elif [ -f "$SCRIPT_DIR/.sops.age" ]; then
     # Fall back to local key file in script directory
     export SOPS_AGE_KEY_FILE="$SCRIPT_DIR/.sops.age"
 else
-    # Try to read from stdin if available
-    if [ ! -t 0 ]; then
-        cat > "$TEMP_KEY"
-        chmod 600 "$TEMP_KEY"
-        export SOPS_AGE_KEY_FILE="$TEMP_KEY"
-    else
-        echo "Error: AGE key not found. Provide one of:"
-        echo "  1. Pipe the key: cat ~/.sops-backup/key.age | ./restore-config.sh production"
-        echo "  2. Environment variable: SOPS_AGE_KEY=\$(cat key.age) ./restore-config.sh production"
-        echo "  3. Key file path: SOPS_AGE_KEY_FILE=~/.sops-backup/key.age ./restore-config.sh production"
-        echo "  4. Local file: Place .sops.age in the script directory"
-        exit 1
-    fi
+    echo "Error: AGE key not found. Provide one of:"
+    echo "  1. Environment variable: SOPS_AGE_KEY=\$(cat key.age) ./restore-config.sh production"
+    echo "  2. Key file path: SOPS_AGE_KEY_FILE=~/.sops-backup/key.age ./restore-config.sh production"
+    echo "  3. Local file: Place .sops.age in the script directory"
+    exit 1
 fi
 
 echo "======================================"
