@@ -1,0 +1,84 @@
+name: Deploy Homelab Infrastructure
+
+# Deploys the base homelab infrastructure stack (mrsimpson/homelab/dev) to the
+# k3s cluster whenever infrastructure code or Pulumi config changes on main.
+#
+# Stack: mrsimpson/homelab/dev
+#
+# Required repository secrets:
+#   TS_OAUTH_CLIENT_ID      - Tailscale OAuth client ID (non-expiring)
+#   TS_OAUTH_CLIENT_SECRET  - Tailscale OAuth client secret
+#   KUBECONFIG              - base64-encoded kubeconfig with Tailscale API server address
+#   PULUMI_ACCESS_TOKEN     - Pulumi Cloud access token
+#
+# See docs/howto/setup-tailscale-cicd.md for one-time operator setup instructions.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "packages/**"
+      - "Pulumi.yaml"
+      - "Pulumi.dev.yaml"
+      - ".github/workflows/deploy-homelab-infra.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  deploy:
+    name: pulumi up (mrsimpson/homelab/dev)
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Join the Tailscale tailnet so we can reach the cluster's Kubernetes API.
+      # The runner is registered as an ephemeral device and is automatically
+      # removed from the tailnet when the job completes.
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_CLIENT_SECRET }}
+          tags: tag:ci
+
+      # Write the kubeconfig so kubectl/Pulumi can reach the cluster API.
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.KUBECONFIG }}" | base64 --decode > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Verify cluster connectivity
+        run: kubectl version --request-timeout=10s
+
+      - name: Pulumi up
+        uses: pulumi/actions@v6
+        with:
+          command: up
+          stack-name: mrsimpson/homelab/dev
+          work-dir: .
+          refresh: true
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
