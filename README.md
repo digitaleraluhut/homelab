@@ -131,6 +131,41 @@ Or extend `packages/core/infrastructure/` for reusable modules.
 - **[How-To Guides](./docs/howto/)** - Setup, deployment, operations
 - **[Security Review](./docs/CRITICAL-REVIEW.md)** - Security assessment
 
+## Security & Secrets
+
+### How secrets are stored
+
+| What | Mechanism | Tracked in git? |
+|------|-----------|-----------------|
+| Pulumi stack config (passwords, tokens, keys) | Pulumi Cloud AES-256-GCM encryption (`secure:` values) | No — `Pulumi.*.yaml` is gitignored |
+| Infrastructure secrets at rest (SOPS) | Age-encrypted `homelab-config/pulumi-config.enc.yaml` | Yes — ciphertext only |
+| OAuth2-proxy user email lists | Pulumi config (`oauth2-proxy:usersEmails`, `oauth2-proxy:developersEmails`) | No — stored in Pulumi Cloud |
+| Age private key | Never committed — lives in `~/.sops-backup/` | No — `*.age` is gitignored |
+
+### Local setup on a new machine
+
+```bash
+# 1. Install dependencies
+./homelab-config/install-dependencies.sh   # pulumi, sops, age, kubectl, helm
+
+# 2. Authenticate with Pulumi Cloud (restores all encrypted stack config)
+pulumi login
+pulumi stack select dev
+
+# 3. Restore the Age key for SOPS decryption
+#    Standard location: ~/.config/sops/age/keys.txt
+#    See: https://github.com/getsops/sops?tab=readme-ov-file#22encrypting-using-age
+mkdir -p ~/.config/sops/age
+cp /path/to/your/backup/pulumi-homelab.age ~/.config/sops/age/keys.txt
+
+# 4. Restore encrypted infrastructure config
+./homelab-config/restore-config.sh
+
+# 5. Set user email lists (first time only — already in Pulumi Cloud on subsequent machines)
+pulumi config set --secret oauth2-proxy:usersEmails '["you@example.com"]' --stack dev
+pulumi config set --secret oauth2-proxy:developersEmails '["you@example.com"]' --stack dev
+```
+
 ## Authentication Systems
 
 This homelab provides two independent authentication systems:
