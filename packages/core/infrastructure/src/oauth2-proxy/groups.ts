@@ -41,19 +41,22 @@ export interface GroupConfig {
   };
 }
 
+import * as pulumi from "@pulumi/pulumi";
+
+const cfg = new pulumi.Config("oauth2-proxy");
+
+/**
+ * Email lists are stored as Pulumi config (JSON arrays, set as secrets):
+ *
+ *   pulumi config set --secret oauth2-proxy:usersEmails '["alice@example.com"]' --stack dev
+ *   pulumi config set --secret oauth2-proxy:developersEmails '["alice@example.com","bob@example.com"]' --stack dev
+ */
 export const groups: Record<string, GroupConfig> = {
   users: {
-    emails: ["user1@example.com", "user2@example.com", "user3@example.com"],
+    emails: cfg.requireObject<string[]>("usersEmails"),
   },
   developers: {
-    emails: [
-      "user1@example.com",
-      "user2@example.com",
-      "user4@example.com",
-      "user5@example.com",
-      "user6@example.com",
-      "user7@example.com",
-    ],
+    emails: cfg.requireObject<string[]>("developersEmails"),
     scopes: ["user:email", "repo", "read:org", "workflow", "gist"],
     app: {
       clientIdKey: "developersClientId",
