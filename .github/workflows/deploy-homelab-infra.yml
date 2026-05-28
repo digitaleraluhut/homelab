@@ -22,6 +22,8 @@ on:
       - "packages/**"
       - "Pulumi.yaml"
       - "Pulumi.dev.yaml"
+      - "homelab-config/pulumi-config.enc.yaml"
+      - "homelab-config/restore-config.sh"
       - ".github/workflows/deploy-homelab-infra.yml"
 
   workflow_dispatch:
