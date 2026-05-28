@@ -512,7 +512,7 @@ kubectl logs -n cloudflare deployment/cloudflared
 Deploy a test service to verify everything works:
 
 ```typescript
-// packages/apps/test/src/index.ts
+// packages/demo-apps/test/src/index.ts
 import type { HomelabContext } from "@mrsimpson/homelab-core-components";
 
 export function createTestApp(homelab: HomelabContext) {

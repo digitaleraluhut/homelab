@@ -15,10 +15,10 @@ Make a containerized web application accessible from the internet via HTTPS, wit
 ### 1. Create the App Package
 
 ```bash
-mkdir -p packages/apps/my-app/src
+mkdir -p packages/demo-apps/my-app/src
 ```
 
-Create `packages/apps/my-app/package.json`:
+Create `packages/demo-apps/my-app/package.json`:
 
 ```json
 {
@@ -37,7 +37,7 @@ Create `packages/apps/my-app/package.json`:
 }
 ```
 
-Create `packages/apps/my-app/tsconfig.json`:
+Create `packages/demo-apps/my-app/tsconfig.json`:
 
 ```json
 {
@@ -49,7 +49,7 @@ Create `packages/apps/my-app/tsconfig.json`:
 
 ### 2. Write the App Module
 
-Create `packages/apps/my-app/src/index.ts`:
+Create `packages/demo-apps/my-app/src/index.ts`:
 
 ```typescript
 import { homelabConfig } from "@mrsimpson/homelab-config";

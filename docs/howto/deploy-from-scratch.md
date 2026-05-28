@@ -293,7 +293,7 @@ The application is accessible via Cloudflare Tunnel's outbound connection only.
 
 ```bash
 # Edit the hello-world app
-vim packages/apps/hello-world/src/index.ts
+vim packages/demo-apps/hello-world/src/index.ts
 
 # Preview changes
 pulumi preview
@@ -307,7 +307,7 @@ pulumi up
 Create a new app file:
 
 ```typescript
-// packages/apps/my-app/src/index.ts
+// packages/demo-apps/my-app/src/index.ts
 import { createExposedWebApp } from "@mrsimpson/homelab-core-components";
 import { homelabConfig } from "@mrsimpson/homelab-config";
 import * as pulumi from "@pulumi/pulumi";

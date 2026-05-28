@@ -78,7 +78,7 @@ export const helloWorldUrl = helloWorldApp.url;
 const nodejsDemoApp = createNodejsDemo(homelab);
 export const nodejsDemoUrl = nodejsDemoApp.url;
 
-// Storage validator - simple nginx-based storage test with automatic R2 backups
+// Demo / smoke-test app: Storage validator — simple nginx-based storage test with automatic R2 backups
 export const storageValidatorApp = homelab.createExposedWebApp(
   "storage-validator",
   {
@@ -95,7 +95,7 @@ export const storageValidatorApp = homelab.createExposedWebApp(
 );
 export const storageValidatorUrl = "https://storage-validator.no-panic.org";
 
-// Auth Demo App - Simple nginx app to test forward authentication
+// Demo / smoke-test app: Auth Demo — simple nginx app to test forward authentication
 export const authDemoApp = homelab.createExposedWebApp("auth-demo", {
   image: "nginxinc/nginx-unprivileged:alpine",
   domain: "auth-demo.no-panic.org",
@@ -105,7 +105,7 @@ export const authDemoApp = homelab.createExposedWebApp("auth-demo", {
 });
 export const authDemoUrl = "https://auth-demo.no-panic.org";
 
-// OAuth2 Demo App - Simple nginx app to test OAuth2-Proxy GitHub authentication
+// Demo / smoke-test app: OAuth2 Demo — simple nginx app to test OAuth2-Proxy GitHub authentication
 export const oauth2DemoApp = homelab.createExposedWebApp("oauth2-demo", {
   image: "nginxinc/nginx-unprivileged:alpine",
   domain: "oauth2-demo.no-panic.org",
