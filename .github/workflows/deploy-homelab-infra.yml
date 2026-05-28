@@ -10,7 +10,7 @@ name: Deploy Homelab Infrastructure
 #   TS_OAUTH_CLIENT_SECRET  - Tailscale OAuth client secret
 #   KUBECONFIG              - base64-encoded kubeconfig with Tailscale API server address
 #   PULUMI_ACCESS_TOKEN     - Pulumi Cloud access token
-#   CLOUDFLARE_ACCOUNT_ID   - Cloudflare account ID (kept secret, not in repo)
+#   SOPS_AGE_KEY            - AGE private key for decrypting Pulumi config
 #
 # See docs/howto/setup-tailscale-cicd.md for one-time operator setup instructions.
 
@@ -77,13 +77,18 @@ jobs:
       - name: Verify cluster connectivity
         run: kubectl version --request-timeout=10s
 
-      # Set sensitive config from secrets (not stored in Pulumi.dev.yaml)
-      - name: Set Pulumi config from secrets
+      # Decrypt and restore Pulumi config from SOPS-encrypted backup
+      - name: Install sops and age
         run: |
-          pulumi config set homelab:cloudflareAccountId "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" --stack mrsimpson/homelab/dev
-          pulumi config set homelab:cloudflareZoneId "${{ secrets.CLOUDFLARE_ZONE_ID }}" --stack mrsimpson/homelab/dev
-          pulumi config set homelab:domain "${{ secrets.HOMELAB_DOMAIN }}" --stack mrsimpson/homelab/dev
-          pulumi config set homelab:email "${{ secrets.HOMELAB_EMAIL }}" --stack mrsimpson/homelab/dev
+          sudo apt-get update && sudo apt-get install -y age
+          curl -LO https://github.com/getsops/sops/releases/download/v3.11.0/sops-v3.11.0.linux.amd64
+          sudo mv sops-v3.11.0.linux.amd64 /usr/local/bin/sops
+          sudo chmod +x /usr/local/bin/sops
+
+      - name: Restore Pulumi config from SOPS
+        run: |
+          export SOPS_AGE_KEY="${{ secrets.SOPS_AGE_KEY }}"
+          bash homelab-config/restore-config.sh mrsimpson/homelab/dev
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
 
