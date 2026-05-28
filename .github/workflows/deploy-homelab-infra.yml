@@ -10,6 +10,7 @@ name: Deploy Homelab Infrastructure
 #   TS_OAUTH_CLIENT_SECRET  - Tailscale OAuth client secret
 #   KUBECONFIG              - base64-encoded kubeconfig with Tailscale API server address
 #   PULUMI_ACCESS_TOKEN     - Pulumi Cloud access token
+#   CLOUDFLARE_ACCOUNT_ID   - Cloudflare account ID (kept secret, not in repo)
 #
 # See docs/howto/setup-tailscale-cicd.md for one-time operator setup instructions.
 
@@ -75,6 +76,13 @@ jobs:
 
       - name: Verify cluster connectivity
         run: kubectl version --request-timeout=10s
+
+      # Set sensitive config from secrets (not stored in Pulumi.dev.yaml)
+      - name: Set Pulumi config from secrets
+        run: |
+          pulumi config set homelab:cloudflareAccountId "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" --stack mrsimpson/homelab/dev
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
 
       - name: Pulumi up
         uses: pulumi/actions@v6
