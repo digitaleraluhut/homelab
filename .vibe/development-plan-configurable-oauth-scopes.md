@@ -35,10 +35,10 @@ export interface GroupConfig {
 
 export const groups: Record<string, GroupConfig> = {
   users: {
-    emails: ["github@beimir.net", "dirk.oberhaus@gmx.de"],
+    emails: ["user1@example.com", "user2@example.com"],
   },
   developers: {
-    emails: ["github@beimir.net"],
+    emails: ["user1@example.com"],
     scopes: ["user:email", "repo", "read:org", "workflow", "gist"],
   },
 };

@@ -1,4 +1,5 @@
 import * as k8s from "@pulumi/kubernetes";
+import { homelabConfig } from "@mrsimpson/homelab-config";
 
 /**
  * traefik-gateway - Gateway API-based HTTP(S) routing with Traefik
@@ -143,7 +144,7 @@ export const gatewayTlsCertificate = new k8s.apiextensions.CustomResource(
         kind: "ClusterIssuer",
       },
       dnsNames: [
-        "*.no-panic.org", // Wildcard certificate only (simpler and more reliable)
+        `*.${homelabConfig.domain}`, // Wildcard certificate only (simpler and more reliable)
       ],
     },
   },

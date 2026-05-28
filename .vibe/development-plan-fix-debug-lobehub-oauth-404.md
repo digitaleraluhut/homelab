@@ -4,13 +4,13 @@
 *Workflow: [bugfix](https://codemcp.github.io/workflows/workflows/bugfix)*
 
 ## Goal
-Fix 404 error user's friend (dirkoberhaus) gets after GitHub OAuth authorization when accessing https://lobehub.no-panic.org/
+Fix 404 error user's friend (github-user3) gets after GitHub OAuth authorization when accessing https://lobehub.no-panic.org/
 
 ## Key Decisions
 - **read:org scope is NOT the issue**: GitHub App "beimir.homelab" (Iv23liZKWPsuTBvPC4vO) has read:org as an installation permission. GitHub surfaces ALL installed permissions on the authorization page. The user sees the same scope.
-- **Friend uses correct oauth2-proxy**: redirect_uri is `oauth.no-panic.org/oauth2/callback` (users group), state encodes lobehub.no-panic.org. Friend is dirkoberhaus, email dirk.oberhaus@gmx.de IS in users group allowlist.
+- **Friend uses correct oauth2-proxy**: redirect_uri is `oauth.no-panic.org/oauth2/callback` (users group), state encodes lobehub.no-panic.org. Friend is github-user3, email user2@example.com IS in users group allowlist.
 - **Two auth layers**: (1) Traefik oauth2-proxy → (2) LobeHub Better Auth. Error proven to originate at layer 1 (oauth2-proxy / GitHub OAuth), not layer 2.
-- **Strategy**: Add test user github.noah@beimir.net to isolate whether issue is oauth2-proxy layer or LobeHub Better Auth layer.
+- **Strategy**: Add test user user3@example.com to isolate whether issue is oauth2-proxy layer or LobeHub Better Auth layer.
 - **All infrastructure routing is healthy** (confirmed via extensive testing):
   - Cloudflare Tunnel → Traefik routing works (Traefik has healthy endpoints at 10.42.0.36:8000)
   - Callback IngressRoute (`Host(oauth.no-panic.org) && PathPrefix(/oauth2/callback)`) correctly forwards to oauth2-proxy-users service
@@ -22,20 +22,20 @@ Fix 404 error user's friend (dirkoberhaus) gets after GitHub OAuth authorization
 - **Root cause narrowed to GitHub App configuration**: The error occurs BEFORE the OAuth callback is generated. The `redirect_uri` parameter sent to GitHub (`https://oauth.no-panic.org/oauth2/callback`) MUST exactly match the "User authorization callback URL" configured in the GitHub App. If mismatched, GitHub shows an error page instead of the authorization screen → no callback is generated → no `/oauth2/callback` log entry.
 - **REVISED (user confirmed): GitHub App has `https://oauth.no-panic.org/oauth2/callback` as first callback URL** — that URL was in the "Callback URL" (installation webhook) field, NOT in the separate "User authorization callback URL" field (for OAuth). These are two distinct fields.
 - **Root cause confirmed: "Request user authorization (OAuth) during installation" was ENABLED**, which LOCKED the "User authorization callback URL" field. oauth2-proxy's standalone OAuth flow required this field to be set. With it locked/empty, GitHub could not redirect users back to oauth2-proxy after authorization.
-- **pulumi up executed** at 13:45 — ConfigMap `oauth2-emails-users` now has `github.noah@beimir.net`, oauth2-proxy pod was recreated. Old pod logs lost.
+- **pulumi up executed** at 13:45 — ConfigMap `oauth2-emails-users` now has `user3@example.com`, oauth2-proxy pod was recreated. Old pod logs lost.
 - **User fix attempted** at ~14:00: disabled "Request user authorization (OAuth) during installation", set "User authorization callback URL" to `https://oauth.no-panic.org/oauth2/callback`. Login at 14:06 still failed — turns out there is no "User authorization callback URL" field; the existing "Callback URL" list is what GitHub uses.
 - **DEFINITIVE ROOT CAUSE (confirmed via Playwright inspection of live GitHub App settings)**: The **"Setup URL"** field is set to `https://oauth.no-panic.org/oauth2/callback` AND **"Redirect on update"** is checked. GitHub redirects to Setup URL after authorization WITHOUT OAuth code/state params → oauth2-proxy rejects the request → user sees 404/error. The Callback URL list IS correct. Fix: clear Setup URL, uncheck "Redirect on update".
 - **Client secret comparison**: k8s starts `7b3c` (40 chars), GitHub App ends `e64c72d3` — cannot confirm match without full secret
-- **GOTCHA: GitHub App visibility restriction**: After fixing Setup URL, `github@beimir.net` (app owner) can log in but `github.noah@beimir.net` (new user) still fails with 404. The GitHub App "beimir.homelab" appears to have visibility restrictions — only the app owner can authorize it. New users get 404 from GitHub when attempting to authorize. **This is a critical gotcha: GitHub Apps can be Public, Internal (org-only), or Private. If not Public, only specific users can authorize.**
+- **GOTCHA: GitHub App visibility restriction**: After fixing Setup URL, `user1@example.com` (app owner) can log in but `user3@example.com` (new user) still fails with 404. The GitHub App "beimir.homelab" appears to have visibility restrictions — only the app owner can authorize it. New users get 404 from GitHub when attempting to authorize. **This is a critical gotcha: GitHub Apps can be Public, Internal (org-only), or Private. If not Public, only specific users can authorize.**
 
 ## Notes
-- User (github@beimir.net / mrsimpson) has an existing valid oauth2-proxy session (cookie: `_oauth2_users`) — this explains why the user can still access lobehub even when new OAuth logins fail. Existing sessions are validated against the email allowlist, not GitHub.
+- User (user1@example.com / github-user1) has an existing valid oauth2-proxy session (cookie: `_oauth2_users`) — this explains why the user can still access lobehub even when new OAuth logins fail. Existing sessions are validated against the email allowlist, not GitHub.
 - The user's existing session continues to work (session refreshes at 10:49 AM, forward-auth 202 responses throughout the day)
 - **ALL new login attempts fail** — NOT just the friend. There are 5 separate `/oauth2/start` requests from real browsers (Chrome/Edge on macOS) at 11:10, 11:12, 11:36, 12:32, and 12:36 — NONE have a subsequent `/oauth2/callback` entry
 - The `/oauth2/start` log entries show correct 302 redirects — oauth2-proxy generates valid GitHub authorization URLs
 - The issue started around 11:10 AM — BEFORE the `pulumi up` deployment (which ran at 12:21-12:21). This rules out the deployment as the trigger.
 - The most likely cause: the GitHub App's "User authorization callback URL" at https://github.com/settings/apps/beimir-homelab is mismatched or was changed around 11:00 AM, preventing GitHub from showing the authorization page
-- **Test account**: `github.noah@beimir.net` — needs to be verified as an actual GitHub user account with email `github.noah@beimir.net` on the account
+- **Test account**: `user3@example.com` — needs to be verified as an actual GitHub user account with email `user3@example.com` on the account
 - **Reproduction script**: `scripts/repro-oauth-failure.txt` — validates all 6 steps of the OAuth flow and confirms infrastructure is healthy
 
 ## Gotchas to Document
@@ -94,7 +94,7 @@ Fix 404 error user's friend (dirkoberhaus) gets after GitHub OAuth authorization
 <!-- beads-synced: 2026-05-21 -->
 *Auto-synced — do not edit here, use `bd` CLI instead.*
 
-- [x] `homelab-10.1.1` Add github.noah@beimir.net to users group allowlist
+- [x] `homelab-10.1.1` Add user3@example.com to users group allowlist
 - [x] `homelab-10.1.2` Deploy updated ConfigMap to cluster via pulumi up
 - [x] `homelab-10.1.3` Test new user login flow end-to-end
 - [x] `homelab-10.1.4` Check oauth2-proxy logs to determine where 404 occurs
@@ -125,7 +125,7 @@ Fix 404 error user's friend (dirkoberhaus) gets after GitHub OAuth authorization
 - **GitHub App callback URL IS correct**: `https://oauth.no-panic.org/oauth2/callback` is the first of multiple configured callback URLs in the GitHub App "beimir.homelab"
 - **Infrastructure is healthy**: Reproduction script passes all 6 steps (Cloudflare → Traefik → oauth2-proxy → GitHub redirect → callback routing → CSRF validation)
 - **k8s secret NOT changed**: `oauth2-proxy-github` created 2026-04-21, last modified 2026-04-21 (27 days ago) — no credential rotation
-- **ConfigMap updated**: `pulumi up` at 13:45 successfully deployed `github.noah@beimir.net` to the allowlist + recreated the oauth2-proxy pod
+- **ConfigMap updated**: `pulumi up` at 13:45 successfully deployed `user3@example.com` to the allowlist + recreated the oauth2-proxy pod
 - **No error logs**: oauth2-proxy shows no error-level messages (excluding expected "Error while parsing OAuth2 state: invalid length" for curl tests without state params)
 - **Client secret**: k8s starts with `7b3c`(40 chars), GitHub App's ends with `e64c72d3` (possibly same secret, can't confirm with partial info)
 
@@ -204,16 +204,16 @@ BUT: The **"Setup URL"** is set to `https://oauth.no-panic.org/oauth2/callback` 
 - "Redirect on update" unchecked ✓
 - Callbacks at 14:49:00 and 14:49:32 succeeded with real GitHub codes → **oauth2-proxy Layer 1 is now FIXED**
 
-#### User-Specific Failure: `github@beimir.net` works, `github.noah@beimir.net` fails
+#### User-Specific Failure: `user1@example.com` works, `user3@example.com` fails
 
-**Critical finding**: After clearing Setup URL and unchecking "Redirect on update", `github@beimir.net` (mrsimpson) can log in successfully, but `github.noah@beimir.net` (noahjott) still fails.
+**Critical finding**: After clearing Setup URL and unchecking "Redirect on update", `user1@example.com` (github-user1) can log in successfully, but `user3@example.com` (github-user2) still fails.
 
 **User's observation**:
-> "I can still log in with github@beimir.net, but not with github.noah@beimir.net. After logging in on oauth proxy, it redirected to lobehub. that also wanted to get a gh auth, but then I clicked the sign in button and as the cookie was already set, it got authenticated without further dialog"
+> "I can still log in with user1@example.com, but not with user3@example.com. After logging in on oauth proxy, it redirected to lobehub. that also wanted to get a gh auth, but then I clicked the sign in button and as the cookie was already set, it got authenticated without further dialog"
 
 **Comparing the two authorization requests:**
 
-| | Working (mrsimpson) | Failing (noahjott) |
+| | Working (github-user1) | Failing (github-user2) |
 |---|---|---|
 | **Flow** | LobeHub Better Auth | oauth2-proxy |
 | **URL** | `github.com/login/oauth/authorize?...` | `github.com/login/oauth/authorize?...` |
@@ -221,24 +221,24 @@ BUT: The **"Setup URL"** is set to `https://oauth.no-panic.org/oauth2/callback` 
 | **redirect_uri** | `lobehub.no-panic.org/api/auth/callback/github` | `oauth.no-panic.org/oauth2/callback` |
 | **scope** | `read:user+user:email` | `user:email+read:org` |
 | **approval_prompt** | none | `force` |
-| **GitHub user** | `mrsimpson` | `noahjott` |
+| **GitHub user** | `github-user1` | `github-user2` |
 | **Response** | Success (200/302) | 404 |
 
 **Key evidence**:
-1. **NO `/oauth2/start` or `/oauth2/callback` entries appear in oauth2-proxy logs for `github.noah@beimir.net`** — the flow never reaches oauth2-proxy
+1. **NO `/oauth2/start` or `/oauth2/callback` entries appear in oauth2-proxy logs for `user3@example.com`** — the flow never reaches oauth2-proxy
 2. The failing request hits GitHub's authorize URL directly and GitHub returns 404
 3. Both requests use the SAME `client_id` (`Iv23liZKWPsuTBvPC4vO`)
-4. `mrsimpson` has existing GitHub organizations (`assistify`, `open-abap`); `noahjott` has NO public org memberships
+4. `github-user1` has existing GitHub organizations (`assistify`, `open-abap`); `github-user2` has NO public org memberships
 5. The `beimir` organization does not appear to exist publicly
 
 **Leading hypothesis: GitHub App visibility restriction**
 
-The GitHub App "beimir.homelab" (`Iv23liZKWPsuTBvPC4vO`) may be configured as **"Internal"** (org-only) or has user access restrictions. `mrsimpson` (app owner/creator) can access it, but `noahjott` cannot.
+The GitHub App "beimir.homelab" (`Iv23liZKWPsuTBvPC4vO`) may be configured as **"Internal"** (org-only) or has user access restrictions. `github-user1` (app owner/creator) can access it, but `github-user2` cannot.
 
 **Why this fits**:
 - GitHub returns 404 when a user tries to authorize an app they don't have access to
-- `mrsimpson` works because they own/created the app
-- `noahjott` fails because they're not authorized to use the app
+- `github-user1` works because they own/created the app
+- `github-user2` fails because they're not authorized to use the app
 - The friend `dirk.oberhaus` also fails (different user, same restriction)
 
 **Alternative hypothesis: `read:org` scope issue**
@@ -246,12 +246,12 @@ The GitHub App "beimir.homelab" (`Iv23liZKWPsuTBvPC4vO`) may be configured as **
 oauth2-proxy requests `scope=user:email+read:org` while Better Auth requests `scope=read:user+user:email`. For GitHub Apps, OAuth "scopes" are actually mapped to app permissions. If the app doesn't have organization read permission, requesting `read:org` might fail for first-time authorizers.
 
 However, this is less likely because:
-- The same scope works for `mrsimpson` (who has already authorized the app)
+- The same scope works for `github-user1` (who has already authorized the app)
 - A scope mismatch would typically show an error page, not a 404
 
 **Verification needed**:
 - Check GitHub App "beimir.homelab" visibility setting (Public / Internal / Private)
-- Check if `noahjott` is listed as an authorized user
+- Check if `github-user2` is listed as an authorized user
 - If app is Internal: either make it Public or add users to the org/allowlist
 
 ### Tasks
@@ -272,7 +272,7 @@ However, this is less likely because:
 - [x] `homelab-10.2.5` Verify callback URL is set as "User authorization callback URL" vs regular "Callback URL" in GitHub App settings — these are different fields
 - [x] `homelab-10.2.6` Check if k8s client_secret matches GitHub App client_secret — k8s starts 7b3c, GH ends e64c72d3
 - [x] `homelab-10.2.7` Re-examine successful 10:22 login flow vs failed 11:10 flows — trace exact differences in logs
-- [x] `homelab-10.2.8` Check pulumi up result — did ConfigMap get updated with github.noah@beimir.net?
+- [x] `homelab-10.2.8` Check pulumi up result — did ConfigMap get updated with user3@example.com?
 - [x] `homelab-10.2.9` Check oauth2-proxy error-level logs for token exchange failures or other errors
 
 ## Fix

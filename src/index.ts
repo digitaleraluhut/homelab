@@ -79,11 +79,13 @@ const nodejsDemoApp = createNodejsDemo(homelab);
 export const nodejsDemoUrl = nodejsDemoApp.url;
 
 // Demo / smoke-test app: Storage validator — simple nginx-based storage test with automatic R2 backups
+const rootDomain = homelabConfig.domain;
+
 export const storageValidatorApp = homelab.createExposedWebApp(
   "storage-validator",
   {
     image: "nginxinc/nginx-unprivileged:alpine",
-    domain: "storage-validator.no-panic.org",
+    domain: `storage-validator.${rootDomain}`,
     port: 8080,
     storage: {
       size: "1Gi",
@@ -93,28 +95,28 @@ export const storageValidatorApp = homelab.createExposedWebApp(
     tags: ["storage", "validation", "persistent", "longhorn", "backup"],
   },
 );
-export const storageValidatorUrl = "https://storage-validator.no-panic.org";
+export const storageValidatorUrl = pulumi.interpolate`https://storage-validator.${rootDomain}`;
 
 // Demo / smoke-test app: Auth Demo — simple nginx app to test forward authentication
 export const authDemoApp = homelab.createExposedWebApp("auth-demo", {
   image: "nginxinc/nginx-unprivileged:alpine",
-  domain: "auth-demo.no-panic.org",
+  domain: `auth-demo.${rootDomain}`,
   port: 8080,
   auth: AuthType.FORWARD, // 🔒 Protected by Authelia forward auth
   tags: ["auth", "demo", "security", "authelia"],
 });
-export const authDemoUrl = "https://auth-demo.no-panic.org";
+export const authDemoUrl = pulumi.interpolate`https://auth-demo.${rootDomain}`;
 
 // Demo / smoke-test app: OAuth2 Demo — simple nginx app to test OAuth2-Proxy GitHub authentication
 export const oauth2DemoApp = homelab.createExposedWebApp("oauth2-demo", {
   image: "nginxinc/nginx-unprivileged:alpine",
-  domain: "oauth2-demo.no-panic.org",
+  domain: `oauth2-demo.${rootDomain}`,
   port: 8080,
   auth: AuthType.OAUTH2_PROXY, // 🔒 Protected by OAuth2-Proxy (GitHub)
   oauth2Proxy: { group: "users" },
   tags: ["auth", "demo", "security", "oauth2-proxy", "github"],
 });
-export const oauth2DemoUrl = "https://oauth2-demo.no-panic.org";
+export const oauth2DemoUrl = pulumi.interpolate`https://oauth2-demo.${rootDomain}`;
 
 // Longhorn UI - Management interface for storage system
 // Note: Using portforwarding instead of Ingress to avoid webhook validation race conditions

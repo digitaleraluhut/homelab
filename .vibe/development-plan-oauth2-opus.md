@@ -1,7 +1,7 @@
 # Development Plan: homelab (oauth2-proxy implementation)
 
 *Generated on 2026-02-08 by Vibe Feature MCP*
-*Workflow: [epcc](https://mrsimpson.github.io/responsible-vibe-mcp/workflows/epcc)*
+*Workflow: [epcc](https://github-user1.github.io/responsible-vibe-mcp/workflows/epcc)*
 
 ## Goal
 Implement OAuth2-Proxy as a centralized authentication gateway with group-based authorization, integrated with Traefik Gateway API, while maintaining coexistence with existing Authelia-protected routes. Follow the 5-phase implementation checklist from the design document.
@@ -107,7 +107,7 @@ See "Key Decisions" section for Phase 1 decisions.
 #### Phase 1: Foundations ✅ (DEPLOYED & VERIFIED)
 - [x] oauth2-proxy namespace created
 - [x] GitHub OAuth Kubernetes Secret created (client-id, client-secret, cookie-secret)
-- [x] groups.ts with initial 'users' group (github@beimir.net)
+- [x] groups.ts with initial 'users' group (user1@example.com)
 - [x] ConfigMaps for email allowlists per group created
 - **Verified**: Namespace active, Secret has 3 keys, ConfigMap contains email allowlist
 
@@ -147,7 +147,7 @@ See "Key Decisions" section for Phase 1 decisions.
 1. index.ts - Module exports
 2. namespace.ts - kubernetes namespace setup
 3. secrets.ts - GitHub OAuth credentials
-4. groups.ts - Single source of truth (users group with github@beimir.net)
+4. groups.ts - Single source of truth (users group with user1@example.com)
 5. email-configmaps.ts - Per-group email allowlists
 6. oauth2-proxy.ts - Helm releases (one per group)
 7. middlewares.ts - Traefik ForwardAuth middleware CRDs

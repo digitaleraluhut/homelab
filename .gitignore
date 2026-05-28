@@ -35,6 +35,7 @@ secrets/
 # Temporary files
 *.log
 *.tmp
+*.bak
 .cache/
 .k3s-backup
 .crowd
