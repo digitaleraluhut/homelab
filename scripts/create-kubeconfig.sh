@@ -162,6 +162,7 @@ rules:
   - pods
   - pods/log
   - pods/status
+  - pods/exec
   - services
   - configmaps
   - persistentvolumeclaims
