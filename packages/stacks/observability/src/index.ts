@@ -18,7 +18,7 @@ import * as k8s from "@pulumi/kubernetes";
 import * as pulumi from "@pulumi/pulumi";
 import { homelabConfig } from "@mrsimpson/homelab-config";
 import { HomelabContext } from "@mrsimpson/homelab-core-components";
-import { createDashboardConfigMaps } from "./dashboards";
+import { createAppDashboardVolume, createDashboardConfigMaps } from "./dashboards";
 
 const config = new pulumi.Config();
 const grafanaAdminPassword = config.requireSecret("grafanaAdminPassword");
@@ -339,6 +339,7 @@ export function setupObservability(args: ObservabilityArgs) {
         "datasources.yaml": `apiVersion: 1
 datasources:
   - name: VictoriaMetrics
+    uid: victoriametrics
     type: prometheus
     url: http://victoria-metrics-server.observability.svc.cluster.local:8428
     access: proxy
@@ -382,6 +383,29 @@ providers:
   const { configMaps: dashboardConfigMaps, volumes: dashboardVolumes } =
     createDashboardConfigMaps(namespace);
 
+  // App dashboards volume — backed by the shared RWX PVC (populated by homelab-apps sync Job)
+  const appDashboardVolume = createAppDashboardVolume();
+
+  // Shared PVC for app dashboards written by external stacks (e.g. homelab-apps).
+  // Grafana mounts it read-only; the owning stack writes dashboard JSON via a sync Job.
+  // Using RWO (single-node cluster allows concurrent mounts on the same node).
+  const appDashboardsPvc = new k8s.core.v1.PersistentVolumeClaim(
+    "grafana-app-dashboards-pvc",
+    {
+      metadata: {
+        name: "grafana-app-dashboards",
+        namespace: "observability",
+        labels: { "managed-by": "homelab-observability" },
+      },
+      spec: {
+        accessModes: ["ReadWriteOnce"],
+        storageClassName: storageClass,
+        resources: { requests: { storage: "100Mi" } },
+      },
+    },
+    { dependsOn: [namespace], customTimeouts: { create: "1s" } },
+  );
+
   // Grafana — routing delegated to HomelabContext (HTTPRoute + DNS via shared infra)
   const grafanaDomain = pulumi.interpolate`grafana.${homelabConfig.domain}`;
   const grafana = args.homelab.createExposedWebApp(
@@ -410,6 +434,7 @@ providers:
           configMap: { name: dashboardProviderConfig.metadata.name },
         },
         ...dashboardVolumes.map((d) => d.volume),
+        appDashboardVolume.volume,
       ],
       extraVolumeMounts: [
         {
@@ -421,6 +446,7 @@ providers:
           mountPath: "/etc/grafana/provisioning/dashboards",
         },
         ...dashboardVolumes.map((d) => d.volumeMount),
+        appDashboardVolume.volumeMount,
       ],
       securityContext: {
         runAsUser: 472,
@@ -437,6 +463,7 @@ providers:
         victoriaMetrics,
         datasourceConfig,
         dashboardProviderConfig,
+        appDashboardsPvc,
         ...dashboardConfigMaps,
       ],
     },
