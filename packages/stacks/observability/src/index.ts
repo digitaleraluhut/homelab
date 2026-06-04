@@ -339,7 +339,6 @@ export function setupObservability(args: ObservabilityArgs) {
         "datasources.yaml": `apiVersion: 1
 datasources:
   - name: VictoriaMetrics
-    uid: victoriametrics
     type: prometheus
     url: http://victoria-metrics-server.observability.svc.cluster.local:8428
     access: proxy
