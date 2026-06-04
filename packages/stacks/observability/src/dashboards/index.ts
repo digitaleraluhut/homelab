@@ -111,3 +111,23 @@ export function createDashboardConfigMaps(
 
   return { configMaps, volumes };
 }
+
+/**
+ * Returns a DashboardVolume backed by a shared ReadWriteMany PVC that carries
+ * app-specific dashboards written by other stacks (e.g. homelab-apps).
+ * The PVC is expected to exist in the observability namespace (created by
+ * the stack that owns the dashboards).
+ */
+export function createAppDashboardVolume(): DashboardVolume {
+  return {
+    volume: {
+      name: "dashboards-app",
+      persistentVolumeClaim: { claimName: "grafana-app-dashboards" },
+    },
+    volumeMount: {
+      name: "dashboards-app",
+      mountPath: "/var/lib/grafana/dashboards/app",
+      readOnly: true,
+    },
+  };
+}
