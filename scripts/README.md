@@ -4,6 +4,16 @@ Operational scripts for managing the K3s cluster and Pulumi infrastructure.
 
 ## Available Scripts
 
+### `analyze-longhorn-storage.sh`
+
+Produces a read-only report of Longhorn volumes, current Kubernetes PVC/PV
+bindings, historical workload references, backup inventories, and R2 target
+status. Credentials are never printed.
+
+```bash
+./scripts/analyze-longhorn-storage.sh --context flinker
+```
+
 ### `install-k3s.sh`
 Installs K3s on the system with proper configuration.
 
@@ -177,4 +187,3 @@ All scripts include robust error handling:
 For detailed information about cluster teardown and troubleshooting, see:
 - `docs/howto/CLUSTER_TEARDOWN.md` - Detailed teardown procedures
 - `CLUSTER_TEARDOWN.md` (root) - Quick reference guide
-

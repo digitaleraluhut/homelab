@@ -21,7 +21,7 @@ import { longhorn } from "./longhorn";
  * longhorn-persistent: For critical data with automatic backups
  *
  * - Retain policy: Data is not deleted when PVC is deleted
- * - Backup policy: Volumes must be labeled manually or via Longhorn groups
+ * - Backup policy: Volumes are assigned to the persistent-backups group
  * - Binding mode: WaitForFirstConsumer (more efficient)
  * - Use case: Databases, critical configurations, important data
  */
@@ -52,8 +52,8 @@ export const persistentStorageClass = new k8s.storage.v1.StorageClass(
       fromBackup: "",
       fsType: "ext4",
       dataLocality: "best-effort",
-      // Note: Longhorn volume groups for backup assignment
-      recurringJobSelector: '[{"name":"backup-daily","isGroup":true}]',
+      // Assign only volumes using this StorageClass to the backup group.
+      recurringJobSelector: '[{"name":"persistent-backups","isGroup":true}]',
     },
   },
   {

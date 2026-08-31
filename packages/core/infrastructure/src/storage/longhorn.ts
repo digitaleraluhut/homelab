@@ -87,6 +87,7 @@ export const longhorn = new k8s.helm.v3.Release(
         upgradeChecker: false,
         allowRecurringJobWhileVolumeDetached: true,
         autoCleanupSystemGeneratedSnapshot: true,
+        autoCleanupWhenDeleteBackup: true,
       },
       longhornUI: {
         replicas: 1,

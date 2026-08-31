@@ -9,7 +9,7 @@ import { getBackupCredentials, backupTargetRoot, hasBackupCredentials } from "./
  * - R2 bucket created manually in Cloudflare
  * - Longhorn manages subfolders per PVC
  * - Credentials from scoped R2 API tokens
- * - Daily backup jobs with label matching
+ * - Daily backup jobs assigned through the persistent-backups group
  */
 
 const config = new pulumi.Config();
@@ -110,7 +110,9 @@ export function createDailyBackupJob(
         task: "backup",
         retain: 7,
         concurrency: 1,
-        groups: ["default"],
+        // Do not use Longhorn's special "default" group: that group applies
+        // the job to every volume without an explicit recurring job.
+        groups: ["persistent-backups"],
         labels: {
           "backup-policy": "daily",
         },
