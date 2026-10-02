@@ -187,13 +187,15 @@ for key, val in config_data['config'].items():
             cmd.append('--secret')
         cmd.extend([key, '--stack', stack])
         
-        # Handle multi-line values by using stdin
-        if '\n' in str(value):
-            # For multi-line values, use stdin redirection
-            result = subprocess.run(cmd, input=str(value), text=True, check=True, capture_output=True)
+        # Use stdin for multi-line values and JSON objects/arrays (starts with [ or {)
+        # to avoid shell quoting issues that cause Pulumi to store them as plain strings
+        # rather than JSON, breaking config.requireObject() at runtime.
+        str_value = str(value)
+        use_stdin = '\n' in str_value or str_value.lstrip().startswith(('{', '['))
+        if use_stdin:
+            result = subprocess.run(cmd, input=str_value, text=True, check=True, capture_output=True)
         else:
-            # For single-line values, use command argument (faster)
-            cmd.append(str(value))
+            cmd.append(str_value)
             result = subprocess.run(cmd, check=True, capture_output=True)
         print(f"✓ {key}")
     except subprocess.CalledProcessError as e:
