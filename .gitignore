@@ -40,3 +40,4 @@ secrets/
 .k3s-backup
 .crowd
 .vibe/beads-state-*.json
+scripts/flinker-ai-rbac.yaml
