@@ -134,10 +134,13 @@ def parse_simple_yaml(content):
                         entry['value'] = '\n'.join(value_lines)
                         continue  # Don't increment i again
                     else:
-                        # Single line value (possibly JSON quoted)
+                        # Single line value (possibly quoted)
                         if value_part.startswith('"') and value_part.endswith('"'):
-                            # JSON string - remove quotes and handle escapes
+                            # JSON-quoted string - remove quotes and handle escapes
                             entry['value'] = json.loads(value_part)
+                        elif value_part.startswith("'") and value_part.endswith("'"):
+                            # YAML single-quoted string - strip the surrounding quotes
+                            entry['value'] = value_part[1:-1]
                         else:
                             entry['value'] = value_part
                 
