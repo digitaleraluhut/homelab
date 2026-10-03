@@ -13,10 +13,10 @@ name: Deploy Homelab Infrastructure
 #   SOPS_AGE_KEY            - AGE private key for decrypting Pulumi config
 #
 # Required repository variables (Settings → Secrets and variables → Variables):
-#   OAUTH2_USERS_EMAILS       - JSON array of emails allowed into the 'users' group
-#                               e.g. '["alice@example.com","bob@example.com"]'
-#   OAUTH2_DEVELOPERS_EMAILS  - JSON array of emails allowed into the 'developers' group
-#                               e.g. '["alice@example.com"]'
+#   OAUTH2_USERS_EMAILS       - Comma-separated list of emails for the 'users' group
+#                               e.g. alice@example.com,bob@example.com
+#   OAUTH2_DEVELOPERS_EMAILS  - Comma-separated list of emails for the 'developers' group
+#                               e.g. alice@example.com
 #
 # See docs/howto/setup-tailscale-cicd.md for one-time operator setup instructions.
 
@@ -96,9 +96,12 @@ jobs:
       - name: Restore Pulumi config from SOPS
         run: |
           export SOPS_AGE_KEY="${{ secrets.SOPS_AGE_KEY }}"
+          # Convert comma-separated email lists to JSON arrays
+          users_json=$(python3 -c "import json,sys; print(json.dumps([e.strip() for e in sys.argv[1].split(',') if e.strip()]))" "${{ vars.OAUTH2_USERS_EMAILS }}")
+          devs_json=$(python3 -c "import json,sys; print(json.dumps([e.strip() for e in sys.argv[1].split(',') if e.strip()]))" "${{ vars.OAUTH2_DEVELOPERS_EMAILS }}")
           bash homelab-config/restore-config.sh mrsimpson/homelab/dev \
-            "oauth2-proxy:usersEmails=${{ vars.OAUTH2_USERS_EMAILS }}" \
-            "oauth2-proxy:developersEmails=${{ vars.OAUTH2_DEVELOPERS_EMAILS }}"
+            "oauth2-proxy:usersEmails=${users_json}" \
+            "oauth2-proxy:developersEmails=${devs_json}"
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
 
