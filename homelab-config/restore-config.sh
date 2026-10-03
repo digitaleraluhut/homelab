@@ -66,15 +66,17 @@ echo ""
 # Decrypted config is piped via stdin — never written to disk.
 echo "Decrypting and restoring configuration to Pulumi..."
 echo "Note: ESC environments require 'pulumi env edit' permissions"
-OVERRIDE_SECRETS_JSON=$(for key in "${!OVERRIDE_SECRETS[@]}"; do echo "\"$key\": \"${OVERRIDE_SECRETS[$key]}\""; done | paste -sd, -)
-if [ -z "$OVERRIDE_SECRETS_JSON" ]; then
-  OVERRIDE_SECRETS_JSON="{}"
-else
-  OVERRIDE_SECRETS_JSON="{$OVERRIDE_SECRETS_JSON}"
-fi
+
+# Pass overrides to Python as a newline-separated list of key=value pairs
+# stored in a single env var. Python will split them safely without any
+# JSON serialisation on the bash side.
+OVERRIDE_LIST=""
+for key in "${!OVERRIDE_SECRETS[@]}"; do
+  OVERRIDE_LIST="${OVERRIDE_LIST}${key}=${OVERRIDE_SECRETS[$key]}"$'\n'
+done
 
 # Export so both sides of the pipe subshell inherit them
-export OVERRIDE_SECRETS_JSON STACK_NAME
+export OVERRIDE_LIST STACK_NAME
 
 # shellcheck disable=SC2016  # expressions in single quotes intentional (python code)
 "$SOPS" -d "$CONFIG_FILE" | python3 -c "$(cat << 'PYTHON'
@@ -167,8 +169,12 @@ print(f"Found {len(config_data.get('config', {}))} config entries")
 stack = os.environ.get('STACK_NAME')
 failed_keys = []
 
-# Load override secrets from environment
-override_secrets = json.loads(os.environ.get('OVERRIDE_SECRETS_JSON', '{}'))
+# Load override secrets from environment (newline-separated key=value pairs)
+override_secrets = {}
+for line in os.environ.get('OVERRIDE_LIST', '').splitlines():
+    if '=' in line:
+        k, _, v = line.partition('=')
+        override_secrets[k.strip()] = v.strip()
 
 for key, val in config_data['config'].items():
     value = val.get('value', '')
@@ -202,14 +208,33 @@ for key, val in config_data['config'].items():
             result = subprocess.run(cmd, check=True, capture_output=True)
         print(f"✓ {key}")
     except subprocess.CalledProcessError as e:
-        error_msg = e.stderr.decode() if e.stderr else str(e)
-        print(f"✗ {key}: {error_msg.strip()}")
-        failed_keys.append(key)
+            error_msg = e.stderr if isinstance(e.stderr, str) else (e.stderr.decode() if e.stderr else str(e))
+            print(f"✗ {key}: {error_msg.strip()}")
+            failed_keys.append(key)
 
 if failed_keys:
     print(f"\n⚠️  Failed to restore {len(failed_keys)} config key(s): {', '.join(failed_keys)}")
 else:
     print(f"\n✅ Successfully restored {len(config_data['config'])} config key(s)")
+
+# Apply any override keys that were NOT in the SOPS backup (extra keys passed via CLI)
+extra_keys = {k: v for k, v in override_secrets.items() if k not in config_data['config']}
+if extra_keys:
+    print(f"\nApplying {len(extra_keys)} extra key(s) from overrides...")
+    for key, value in sorted(extra_keys.items()):
+        try:
+            cmd = ['pulumi', 'config', 'set', key, '--stack', stack]
+            str_value = str(value)
+            use_stdin = '\n' in str_value or str_value.lstrip().startswith(('{', '['))
+            if use_stdin:
+                result = subprocess.run(cmd, input=str_value, text=True, check=True, capture_output=True)
+            else:
+                cmd.append(str_value)
+                result = subprocess.run(cmd, check=True, capture_output=True)
+            print(f"✓ {key} (override)")
+        except subprocess.CalledProcessError as e:
+            error_msg = e.stderr if isinstance(e.stderr, str) else (e.stderr.decode() if e.stderr else str(e))
+            print(f"✗ {key}: {error_msg.strip()}")
 
 PYTHON
 )"
