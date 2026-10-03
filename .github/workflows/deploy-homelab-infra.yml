@@ -90,7 +90,9 @@ jobs:
       - name: Restore Pulumi config from SOPS
         run: |
           export SOPS_AGE_KEY="${{ secrets.SOPS_AGE_KEY }}"
-          bash homelab-config/restore-config.sh mrsimpson/homelab/dev
+          bash homelab-config/restore-config.sh mrsimpson/homelab/dev \
+            "oauth2-proxy:usersEmails=${{ secrets.OAUTH2_USERS_EMAILS }}" \
+            "oauth2-proxy:developersEmails=${{ secrets.OAUTH2_DEVELOPERS_EMAILS }}"
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
 
