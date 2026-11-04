@@ -36,13 +36,10 @@ export const storageClasses = {
 
 // Verify storage classes were created (helps ensure longhorn is deployed)
 pulumi
-  .all([
-    persistentStorageClass.metadata.name,
-    uncriticalStorageClass.metadata.name,
-  ])
+  .all([persistentStorageClass.metadata.name, uncriticalStorageClass.metadata.name])
   .apply(([persistentName, uncriticalName]) => {
     pulumi.log.info(
-      `Storage classes exported: persistent=${persistentName}, uncritical=${uncriticalName}`,
+      `Storage classes exported: persistent=${persistentName}, uncritical=${uncriticalName}`
     );
   });
 
@@ -59,6 +56,22 @@ export const domain = homelabConfig.domain;
 import { releases as oauth2ProxyReleases } from "@mrsimpson/homelab-core-infrastructure";
 
 export const oauth2ProxyInstances = oauth2ProxyReleases;
+
+// CI access for digitaleraluhut/homelab-apps: least-privilege ServiceAccount + kubeconfig.
+// To add an app: append its namespace to appNamespaces. If the namespace does not exist
+// yet, leave it out of existingNamespaces: it is then created here, and the app must not
+// create it itself.
+import { createCiAccess } from "@mrsimpson/homelab-core-infrastructure";
+
+// lobehub and matrix are deliberately disabled (namespaces removed). To re-enable one,
+// add it here but NOT to existingNamespaces, and drop the app's own Namespace resource.
+const appNamespaces = ["aftertouch", "code", "librechat"];
+const ciAccess = createCiAccess({
+  appNamespaces,
+  existingNamespaces: appNamespaces,
+  apiServer: new pulumi.Config("homelab").get("ciApiServer") ?? "https://100.70.179.36:6443",
+});
+export const ciAppsKubeconfig = ciAccess.kubeconfig;
 
 // Observability stack — VictoriaMetrics + Grafana
 import { setupObservability } from "@mrsimpson/homelab-observability";
@@ -81,20 +94,17 @@ export const nodejsDemoUrl = nodejsDemoApp.url;
 // Demo / smoke-test app: Storage validator — simple nginx-based storage test with automatic R2 backups
 const rootDomain = homelabConfig.domain;
 
-export const storageValidatorApp = homelab.createExposedWebApp(
-  "storage-validator",
-  {
-    image: "nginxinc/nginx-unprivileged:alpine",
-    domain: `storage-validator.${rootDomain}`,
-    port: 8080,
-    storage: {
-      size: "1Gi",
-      storageClass: "longhorn-persistent", // Automatically enables R2 backups
-      mountPath: "/usr/share/nginx/html/storage",
-    },
-    tags: ["storage", "validation", "persistent", "longhorn", "backup"],
+export const storageValidatorApp = homelab.createExposedWebApp("storage-validator", {
+  image: "nginxinc/nginx-unprivileged:alpine",
+  domain: `storage-validator.${rootDomain}`,
+  port: 8080,
+  storage: {
+    size: "1Gi",
+    storageClass: "longhorn-persistent", // Automatically enables R2 backups
+    mountPath: "/usr/share/nginx/html/storage",
   },
-);
+  tags: ["storage", "validation", "persistent", "longhorn", "backup"],
+});
 export const storageValidatorUrl = pulumi.interpolate`https://storage-validator.${rootDomain}`;
 
 // Demo / smoke-test app: Auth Demo — simple nginx app to test forward authentication
@@ -129,6 +139,5 @@ export const longhornUIPortForwardCommand =
   "kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80";
 export const longhornUI = {
   accessMethod: "portforward",
-  command:
-    "kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80",
+  command: "kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80",
 };
