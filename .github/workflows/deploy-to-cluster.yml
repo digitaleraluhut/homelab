@@ -84,24 +84,28 @@ on:
     secrets:
       TS_OAUTH_CLIENT_ID:
         description: Tailscale OAuth client ID for joining the tailnet.
-        required: true
+        required: false  # provided by the caller's production environment
       TS_OAUTH_CLIENT_SECRET:
         description: Tailscale OAuth client secret for joining the tailnet.
-        required: true
+        required: false  # provided by the caller's production environment
       KUBECONFIG:
         description: >
           base64-encoded kubeconfig. The server address must use the cluster node's
           Tailscale hostname or IP (not 127.0.0.1).
           Generate with: base64 -w0 ~/.kube/config
-        required: true
+        required: false  # provided by the caller's production environment
       PULUMI_ACCESS_TOKEN:
         description: Pulumi Cloud access token for state backend access.
-        required: true
+        required: false  # provided by the caller's production environment
 
 jobs:
   deploy:
     name: pulumi ${{ inputs.pulumi-command }} (${{ inputs.pulumi-stack }})
     runs-on: ubuntu-latest
+    # Resolved in the CALLER's repository: its "production" environment (main only)
+    # supplies the secrets. Environment secrets take precedence over secrets passed
+    # by the caller, so the caller's `secrets:` map is only a fallback.
+    environment: production
 
     permissions:
       contents: read
