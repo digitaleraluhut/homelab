@@ -53,6 +53,18 @@ describe("createCiAccess", () => {
     expect(nss).toEqual(["app-new", "ci-access"]);
   });
 
+  it("labels namespaces it creates as pod-security restricted", () => {
+    const ns = created.find(
+      (c) =>
+        c.type === "kubernetes:core/v1:Namespace" &&
+        (c.inputs.metadata as { name: string }).name === "app-new"
+    );
+    const labels = (ns?.inputs.metadata as { labels: Record<string, string> }).labels;
+    for (const mode of ["enforce", "audit", "warn"]) {
+      expect(labels[`pod-security.kubernetes.io/${mode}`]).toBe("restricted");
+    }
+  });
+
   it("limits namespace update/patch/delete to the app namespaces", () => {
     const role = created.find(
       (c) => c.name === "ci-homelab-apps-namespaces" && c.type.endsWith("ClusterRole")
