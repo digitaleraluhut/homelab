@@ -76,6 +76,14 @@ const ciAccess = createCiAccess({
 });
 export const ciAppsKubeconfig = ciAccess.kubeconfig;
 
+// Read-only cluster access for the AI operator account on the node (diagnostics:
+// pods, logs, events, CRD status; no Secrets, no writes). Used locally on the node,
+// so the API server is reached via loopback (127.0.0.1 is in the API cert SANs).
+import { createOperatorAccess } from "@mrsimpson/homelab-core-infrastructure";
+
+const operatorAccess = createOperatorAccess({ apiServer: "https://127.0.0.1:6443" });
+export const operatorKubeconfig = operatorAccess.kubeconfig;
+
 // Observability stack — VictoriaMetrics + Grafana
 import { setupObservability } from "@mrsimpson/homelab-observability";
 
