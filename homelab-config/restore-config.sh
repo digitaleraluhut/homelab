@@ -1,5 +1,8 @@
 #!/bin/bash
-set -e
+# pipefail: if `sops -d` fails, the pipe into python must fail too. Without it an
+# undecryptable file looked like an empty config, the script exited 0 and
+# `pulumi up` ran with incomplete config.
+set -eo pipefail
 
 # Restore Pulumi config from encrypted backup
 # This decrypts the SOPS-encrypted config and restores it to a Pulumi stack
@@ -160,8 +163,8 @@ content = sys.stdin.read()
 
 config_data = parse_simple_yaml(content)
 
-if not config_data or 'config' not in config_data:
-    print("Error: No config found in decrypted file")
+if not config_data or not config_data.get('config'):
+    print("Error: No config found in decrypted file (did decryption fail?)")
     sys.exit(1)
 
 print(f"Found {len(config_data.get('config', {}))} config entries")
@@ -235,6 +238,12 @@ if extra_keys:
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr if isinstance(e.stderr, str) else (e.stderr.decode() if e.stderr else str(e))
             print(f"✗ {key}: {error_msg.strip()}")
+            failed_keys.append(key)
+
+# Never report success with a partially restored config: `pulumi up` would run anyway.
+if failed_keys:
+    print(f"\n❌ Config restore incomplete ({len(failed_keys)} key(s) failed): {', '.join(failed_keys)}")
+    sys.exit(1)
 
 PYTHON
 )"
