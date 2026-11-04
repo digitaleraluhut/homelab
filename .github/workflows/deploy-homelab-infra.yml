@@ -44,6 +44,8 @@ jobs:
   deploy:
     name: pulumi up (mrsimpson/homelab/dev)
     runs-on: ubuntu-latest
+    # Secrets live in the "production" environment, which only main may use.
+    environment: production
 
     permissions:
       contents: read

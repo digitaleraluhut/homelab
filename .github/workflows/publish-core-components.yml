@@ -9,12 +9,11 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: production
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
@@ -29,16 +28,22 @@ jobs:
         run: npm run build
         working-directory: packages/core/components
 
-      - name: Bump patch version
+      # main is protected (PRs only), so the version bump is no longer committed.
+      # package.json holds the minimum version (bump major/minor there by hand);
+      # CI publishes max(package.json, latest on npm + 1 patch).
+      - name: Compute next version
         working-directory: packages/core/components
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          npm version patch --no-git-tag-version
-          VERSION=$(node -p "require('./package.json').version")
-          git add package.json
-          git commit -m "chore(components): bump version to ${VERSION} [skip ci]"
-          git push
+          NAME=$(node -p "require('./package.json').name")
+          PUBLISHED=$(npm view "$NAME" version 2>/dev/null || echo 0.0.0)
+          VERSION=$(node -e '
+            const [p, l] = process.argv.slice(1).map(v => v.split(".").map(Number));
+            const next = [l[0], l[1], l[2] + 1];
+            const cmp = p[0] - next[0] || p[1] - next[1] || p[2] - next[2];
+            console.log((cmp > 0 ? p : next).join("."));
+          ' "$(node -p "require('./package.json').version")" "$PUBLISHED")
+          echo "Publishing $NAME@$VERSION (npm had $PUBLISHED)"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Publish
         run: npm publish
