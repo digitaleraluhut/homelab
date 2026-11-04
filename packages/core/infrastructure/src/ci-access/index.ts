@@ -95,7 +95,15 @@ export function createCiAccess(args: CiAccessArgs) {
   const createdNamespaces = missing.map(
     (name) =>
       new k8s.core.v1.Namespace(`ci-app-ns-${name}`, {
-        metadata: { name, labels: LABELS },
+        metadata: {
+          name,
+          labels: {
+            ...LABELS,
+            "pod-security.kubernetes.io/enforce": "restricted",
+            "pod-security.kubernetes.io/audit": "restricted",
+            "pod-security.kubernetes.io/warn": "restricted",
+          },
+        },
       })
   );
 
