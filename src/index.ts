@@ -65,10 +65,13 @@ import { createCiAccess } from "@mrsimpson/homelab-core-infrastructure";
 
 // lobehub and matrix are deliberately disabled (namespaces removed). To re-enable one,
 // add it here but NOT to existingNamespaces, and drop the app's own Namespace resource.
-const appNamespaces = ["aftertouch", "code", "librechat"];
+// Namespaces created by the app stacks themselves.
+const existingNamespaces = ["aftertouch", "code", "librechat"];
+// "wiki" is NOT in existingNamespaces on purpose: it is created here and apps/wiki only references it.
+const appNamespaces = [...existingNamespaces, "wiki"];
 const ciAccess = createCiAccess({
   appNamespaces,
-  existingNamespaces: appNamespaces,
+  existingNamespaces,
   apiServer: new pulumi.Config("homelab").get("ciApiServer") ?? "https://100.70.179.36:6443",
 });
 export const ciAppsKubeconfig = ciAccess.kubeconfig;
