@@ -63,7 +63,9 @@ export const oauth2ProxyInstances = oauth2ProxyReleases;
 // create it itself.
 import { createCiAccess } from "@mrsimpson/homelab-core-infrastructure";
 
-const appNamespaces = ["aftertouch", "code", "librechat", "lobehub", "matrix"];
+// lobehub and matrix are deliberately disabled (namespaces removed). To re-enable one,
+// add it here but NOT to existingNamespaces, and drop the app's own Namespace resource.
+const appNamespaces = ["aftertouch", "code", "librechat"];
 const ciAccess = createCiAccess({
   appNamespaces,
   existingNamespaces: appNamespaces,
