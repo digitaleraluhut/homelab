@@ -1,0 +1,11 @@
+---
+# Host configuration for flinker. Applied by the runner (roles/runner) as root
+# from digitaleraluhut/homelab main. See host/README.md.
+- name: Configure the homelab host
+  hosts: homelab
+  gather_facts: true
+  roles:
+    - role: runner
+      tags: [runner]
+    - role: aioperator
+      tags: [aioperator]

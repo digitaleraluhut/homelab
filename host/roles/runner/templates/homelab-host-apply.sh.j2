@@ -1,0 +1,35 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Pulls {{ runner_repo }} ({{ runner_branch }}) and applies host/site.yml.
+# host/mode decides: "check" only reports the diff, "apply" changes the host.
+# The runner role itself is always applied, so changes to the runner take
+# effect even in check mode.
+set -euo pipefail
+
+repo={{ runner_repo | quote }}
+branch={{ runner_branch | quote }}
+dir={{ (runner_state_dir ~ '/checkout') | quote }}
+
+exec 9>/run/homelab-host-apply.lock
+flock -n 9 || { echo "another run is in progress"; exit 0; }
+
+if [[ -d $dir/.git ]]; then
+  git -C "$dir" fetch --quiet --depth 1 origin "$branch"
+  git -C "$dir" reset --quiet --hard FETCH_HEAD
+  git -C "$dir" clean --quiet -ffdx
+else
+  git clone --quiet --depth 1 --branch "$branch" "$repo" "$dir"
+fi
+
+rev=$(git -C "$dir" rev-parse --short HEAD)
+mode=$(tr -d '[:space:]' < "$dir/host/mode")
+echo "homelab@$rev mode=$mode"
+
+cd "$dir/host"
+export ANSIBLE_CONFIG="$dir/host/ansible.cfg"
+ansible-playbook site.yml --tags runner
+case $mode in
+  apply) ansible-playbook site.yml --skip-tags runner --diff ;;
+  check) ansible-playbook site.yml --skip-tags runner --check --diff ;;
+  *) echo "host/mode must be 'check' or 'apply', got '$mode'" >&2; exit 1 ;;
+esac

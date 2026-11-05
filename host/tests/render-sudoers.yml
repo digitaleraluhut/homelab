@@ -1,0 +1,16 @@
+---
+# CI check: render the sudoers template with the role defaults and let visudo
+# validate it. Run: ansible-playbook tests/render-sudoers.yml
+- name: Render and validate the operator sudoers file
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../roles/aioperator/defaults/main.yml
+  tasks:
+    - name: Render sudoers
+      ansible.builtin.template:
+        src: ../roles/aioperator/templates/sudoers.j2
+        dest: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/sudoers.aioperator"
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s

@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+# Sudo whitelist for the AI operator. Changes go through a reviewed PR to
+# digitaleraluhut/homelab (host/roles/aioperator/defaults/main.yml).
+{{ aioperator_user }} ALL=(root) NOEXEC: NOPASSWD: {{ aioperator_sudo_noexec | join(', ') }}
+{{ aioperator_user }} ALL=(root) NOPASSWD: {{ aioperator_sudo_ops | join(', ') }}

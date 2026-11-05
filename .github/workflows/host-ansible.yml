@@ -1,0 +1,46 @@
+name: Host config (Ansible)
+
+# Lints the host playbook and validates the rendered sudoers file. The host
+# itself pulls main (host/README.md); nothing here touches the host.
+
+on:
+  pull_request:
+    paths:
+      - "host/**"
+      - ".github/workflows/host-ansible.yml"
+  push:
+    branches: [main]
+    paths:
+      - "host/**"
+      - ".github/workflows/host-ansible.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: host
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same ansible-core line as Ubuntu 24.04's apt package on the host.
+      - name: Install ansible-core and ansible-lint
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet 'ansible-core>=2.16,<2.17' ansible-lint
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Check mode file
+        run: grep -qxE 'check|apply' mode
+
+      - name: ansible-lint
+        run: ansible-lint
+
+      - name: Syntax check
+        run: ansible-playbook site.yml --syntax-check
+
+      - name: Render and validate sudoers
+        run: ansible-playbook tests/render-sudoers.yml
