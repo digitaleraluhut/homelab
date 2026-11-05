@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Periodically apply homelab host configuration
+
+[Timer]
+OnBootSec=5min
+OnCalendar={{ runner_calendar }}
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

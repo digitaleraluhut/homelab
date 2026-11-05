@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Apply homelab host configuration (digitaleraluhut/homelab host/)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/homelab-host-apply
+Nice=10
+TimeoutStartSec=30min

@@ -1,0 +1,44 @@
+---
+- name: Install ansible-core and git
+  ansible.builtin.apt:
+    name: [ansible-core, git]
+    state: present
+
+- name: Create the runner state directory
+  ansible.builtin.file:
+    path: "{{ runner_state_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+# The template module replaces files by rename, so rewriting the script while
+# it runs is safe: bash keeps reading the old inode.
+- name: Install the runner script
+  ansible.builtin.template:
+    src: homelab-host-apply.sh.j2
+    dest: /usr/local/sbin/homelab-host-apply
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Install the runner service and timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - homelab-host-apply.service
+    - homelab-host-apply.timer
+  notify: Reload systemd
+
+- name: Flush handlers before enabling the timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the runner timer
+  ansible.builtin.systemd_service:
+    name: homelab-host-apply.timer
+    enabled: true
+    state: started

@@ -1,0 +1,80 @@
+---
+- name: Create the operator user
+  ansible.builtin.user:
+    name: "{{ aioperator_user }}"
+    comment: AI Operator,,,
+    shell: /bin/bash
+    home: "{{ aioperator_home }}"
+    groups: "{{ aioperator_groups }}"
+    append: true
+
+- name: Keep the operator home private
+  ansible.builtin.file:
+    path: "{{ aioperator_home }}"
+    state: directory
+    owner: "{{ aioperator_user }}"
+    group: "{{ aioperator_user }}"
+    mode: "0750"
+
+# visudo validates before the file is moved into place, so a broken template
+# can never lock sudo.
+- name: Install the operator sudo whitelist
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: "/etc/sudoers.d/{{ aioperator_user }}"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+
+# No restart handler on purpose: restarting claude-remote ends the operator's
+# own session. Unit changes take effect at the next restart by the owner or a
+# reboot.
+- name: Install the Claude Code remote-control service
+  ansible.builtin.template:
+    src: claude-remote.service.j2
+    dest: /etc/systemd/system/claude-remote.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Flush handlers before enabling the service
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the Claude Code remote-control service
+  ansible.builtin.systemd_service:
+    name: claude-remote.service
+    enabled: true
+    state: started
+
+- name: Check out the skills-coding repository
+  become: true
+  become_user: "{{ aioperator_user }}"
+  ansible.builtin.git:
+    repo: "{{ aioperator_skills_coding_repo }}"
+    dest: "{{ aioperator_skills_coding_dir }}"
+    version: main
+    update: true
+
+- name: Create the skill directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ aioperator_user }}"
+    group: "{{ aioperator_user }}"
+    mode: "0755"
+  loop: "{{ aioperator_skill_dirs }}"
+
+- name: Link the skills into every harness
+  ansible.builtin.file:
+    src: "{{ item.1.value }}"
+    dest: "{{ item.0 }}/{{ item.1.key }}"
+    state: link
+    force: true
+    follow: false
+    owner: "{{ aioperator_user }}"
+    group: "{{ aioperator_user }}"
+  loop: "{{ aioperator_skill_dirs | product(aioperator_skills | dict2items) | list }}"
+  loop_control:
+    label: "{{ item.0 }}/{{ item.1.key }}"

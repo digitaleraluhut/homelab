@@ -1,0 +1,5 @@
+---
+runner_repo: https://github.com/digitaleraluhut/homelab.git
+runner_branch: main
+runner_state_dir: /var/lib/homelab-host
+runner_calendar: hourly
