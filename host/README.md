@@ -2,6 +2,7 @@
 
 Everything on `flinker` that is not Kubernetes: users, sudo, systemd units,
 host services. The cluster and GitHub stay in Pulumi.
+Why: [ADR-018](../docs/adr/018-host-configuration-ansible-pull.md). Operating it: [manage-host-config](../docs/howto/manage-host-config.md).
 
 ## How it is applied
 
