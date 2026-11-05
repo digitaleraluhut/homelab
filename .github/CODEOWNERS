@@ -1,1 +1,9 @@
-* @mrsimpson
+# Everything requires review by default (infra, host, CI, scripts, dependencies).
+*            @mrsimpson
+
+# Exceptions: no owner = no code-owner review required.
+# Documentation and agent working state do not change the running system.
+/docs/
+/.vibe/
+/.beads/
+/README.md
