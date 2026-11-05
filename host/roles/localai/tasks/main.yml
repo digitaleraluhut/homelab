@@ -45,6 +45,29 @@
     mode: "0750"
   loop: "{{ localai_data_dirs + ['.config', '.config/llama-cpp', '.config/systemd', '.config/systemd/user'] }}"
 
+- name: Create the podman config directory
+  ansible.builtin.file:
+    path: "{{ localai_home }}/.config/containers"
+    state: directory
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0750"
+
+# localai is a system user: journald keeps no per-user journal for it, so
+# container logs in journald are unreadable for localai itself. distrobox
+# enter waits for "container_setup_done" in the container log and would hang
+# forever. Applies to containers created after this file exists.
+- name: Let rootless podman log to files
+  ansible.builtin.copy:
+    dest: "{{ localai_home }}/.config/containers/containers.conf"
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0644"
+    content: |
+      # {{ ansible_managed }}
+      [containers]
+      log_driver = "k8s-file"
+
 # force: the pinned ref is the truth; local edits on the host are reverted.
 - name: Check out the pinned local-ai ref
   become: true
