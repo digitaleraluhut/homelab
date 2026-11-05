@@ -224,11 +224,15 @@ export function createCiAccess(args: CiAccessArgs) {
 }
 
 /** Builds the kubeconfig from the token Secret's data (values base64-encoded). */
-export function renderKubeconfig(data: Record<string, string> | undefined, server: string): string {
+export function renderKubeconfig(
+  data: Record<string, string> | undefined,
+  server: string,
+  user = `${NAMESPACE}-${SA_NAME}`,
+  context = "homelab-apps-ci"
+): string {
   if (!data?.token || !data?.["ca.crt"]) {
     return "token not populated yet - run the deploy once more";
   }
-  const user = `${NAMESPACE}-${SA_NAME}`;
   return [
     "apiVersion: v1",
     "kind: Config",
@@ -242,11 +246,11 @@ export function renderKubeconfig(data: Record<string, string> | undefined, serve
     "  user:",
     `    token: ${Buffer.from(data.token, "base64").toString("utf8")}`,
     "contexts:",
-    "- name: homelab-apps-ci",
+    `- name: ${context}`,
     "  context:",
     "    cluster: homelab",
     `    user: ${user}`,
-    "current-context: homelab-apps-ci",
+    `current-context: ${context}`,
     "",
   ].join("\n");
 }
