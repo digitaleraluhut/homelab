@@ -9,3 +9,5 @@
       tags: [runner]
     - role: aioperator
       tags: [aioperator]
+    - role: localai
+      tags: [localai]
