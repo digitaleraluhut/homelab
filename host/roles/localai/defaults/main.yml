@@ -1,0 +1,37 @@
+---
+# Local AI services (digitaleraluhut/local-ai) as systemd user units of the
+# unprivileged system user localai. Decision: local-ai#7, homelab#60.
+localai_user: localai
+localai_home: /srv/localai
+localai_groups: [render, video]   # GPU: /dev/kfd, /dev/dri
+# Rootless podman/distrobox. Must not overlap other ranges in /etc/subuid.
+localai_subid_start: 300000
+localai_subid_count: 65536
+
+localai_repo: https://github.com/digitaleraluhut/local-ai.git
+# Pinned: a merge in local-ai reaches the host only after this is bumped here.
+localai_ref: ea13b91f87c414daa15d2c73ae7d28ea6ebdfc73
+localai_checkout: "{{ localai_home }}/local-ai"
+
+# Data the wrappers expect under $HOME (moved there once by hand).
+localai_data_dirs: [models, ComfyUI, opt, images]
+
+# Unit templates and drop-ins copied from the checkout's systemd/ directory.
+localai_unit_files:
+  - llama-server@.service
+  - llama-q38@.service
+  - whisper-server@.service
+  - comfyui-server@.service
+localai_unit_dropins:
+  - llama-q38@.service.d
+
+# Instances that should run. Ports: router 8080, qwen3.8-dual 8090,
+# whisper 8081, comfyui 8082 (bridge) / 8188.
+localai_instances:
+  - llama-server@router.service
+  - llama-q38@qwen3.8-dual.service
+  - whisper-server@whisper.service
+  - comfyui-server@comfyui.service
+# false while the services still run as jaegle (same ports, same GPU memory):
+# everything is installed, nothing is started.
+localai_services_enabled: false

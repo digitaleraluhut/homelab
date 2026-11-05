@@ -1,0 +1,111 @@
+---
+- name: Create the localai system user
+  ansible.builtin.user:
+    name: "{{ localai_user }}"
+    comment: Local AI services
+    system: true
+    home: "{{ localai_home }}"
+    create_home: true
+    shell: /bin/bash   # distrobox enters with the user's shell
+    password: "!"
+    groups: "{{ localai_groups }}"
+    append: true
+  register: localai_account
+
+- name: Keep the localai home private to the user and its group
+  ansible.builtin.file:
+    path: "{{ localai_home }}"
+    state: directory
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0750"
+
+- name: Assign subordinate UID/GID ranges for rootless containers
+  ansible.builtin.lineinfile:
+    path: "{{ item }}"
+    regexp: "^{{ localai_user }}:"
+    line: "{{ localai_user }}:{{ localai_subid_start }}:{{ localai_subid_count }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [/etc/subuid, /etc/subgid]
+
+- name: Start the localai user manager at boot (linger)
+  ansible.builtin.command:
+    cmd: loginctl enable-linger {{ localai_user }}
+    creates: /var/lib/systemd/linger/{{ localai_user }}
+
+- name: Create data and config directories
+  ansible.builtin.file:
+    path: "{{ localai_home }}/{{ item }}"
+    state: directory
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0750"
+  loop: "{{ localai_data_dirs + ['.config', '.config/llama-cpp', '.config/systemd', '.config/systemd/user'] }}"
+
+# force: the pinned ref is the truth; local edits on the host are reverted.
+- name: Check out the pinned local-ai ref
+  become: true
+  become_user: "{{ localai_user }}"
+  ansible.builtin.git:
+    repo: "{{ localai_repo }}"
+    dest: "{{ localai_checkout }}"
+    version: "{{ localai_ref }}"
+    force: true
+  notify: Restart local-ai services
+
+# The container wrappers read presets from ~/.config/llama-cpp (container home
+# = host home). Without this, preset changes only arrive when a container is
+# recreated.
+- name: Sync presets into the container config directory
+  ansible.builtin.copy:
+    src: "{{ localai_checkout }}/configs/"
+    dest: "{{ localai_home }}/.config/llama-cpp/"
+    remote_src: true
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0640"
+    directory_mode: "0750"
+  notify: Restart local-ai services
+
+- name: Install unit templates
+  ansible.builtin.copy:
+    src: "{{ localai_checkout }}/systemd/{{ item }}"
+    dest: "{{ localai_home }}/.config/systemd/user/{{ item }}"
+    remote_src: true
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0644"
+  loop: "{{ localai_unit_files }}"
+  notify: Restart local-ai services
+
+- name: Install unit drop-ins
+  ansible.builtin.copy:
+    src: "{{ localai_checkout }}/systemd/{{ item }}/"
+    dest: "{{ localai_home }}/.config/systemd/user/{{ item }}/"
+    remote_src: true
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0644"
+    directory_mode: "0755"
+  loop: "{{ localai_unit_dropins }}"
+  notify: Restart local-ai services
+
+- name: Flush handlers before managing the services
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the service instances
+  become: true
+  become_user: "{{ localai_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ localai_account.uid }}"
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    scope: user
+    daemon_reload: true
+    enabled: true
+    state: started
+  loop: "{{ localai_instances }}"
+  when: localai_services_enabled
