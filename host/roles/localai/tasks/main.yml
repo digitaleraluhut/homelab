@@ -93,6 +93,36 @@
   loop: "{{ localai_unit_dropins }}"
   notify: Restart local-ai services
 
+- name: Create the lab preset directory (group-writable)
+  ansible.builtin.file:
+    path: "{{ localai_lab_dir }}"
+    state: directory
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "2770"
+
+- name: Create the lab drop-in directory
+  ansible.builtin.file:
+    path: "{{ localai_home }}/.config/systemd/user/{{ localai_lab_instance }}.d"
+    state: directory
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0755"
+
+# distrobox passes the environment into the container, so the in-box
+# launcher reads lab/lab.ini instead of ~/.config/llama-cpp.
+- name: Point the lab instance at the lab preset and its own port
+  ansible.builtin.copy:
+    dest: "{{ localai_home }}/.config/systemd/user/{{ localai_lab_instance }}.d/lab.conf"
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0644"
+    content: |
+      # {{ ansible_managed }}
+      [Service]
+      Environment=LLAMA_CONFIG_DIR={{ localai_lab_dir }}
+      Environment=LLAMA_SERVER_PORT={{ localai_lab_port }}
+
 - name: Flush handlers before managing the services
   ansible.builtin.meta: flush_handlers
 
@@ -108,4 +138,3 @@
     enabled: true
     state: started
   loop: "{{ localai_instances }}"
-  when: localai_services_enabled

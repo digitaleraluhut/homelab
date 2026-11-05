@@ -32,6 +32,10 @@ localai_instances:
   - llama-q38@qwen3.8-dual.service
   - whisper-server@whisper.service
   - comfyui-server@comfyui.service
-# false while the services still run as jaegle (same ports, same GPU memory):
-# everything is installed, nothing is started.
-localai_services_enabled: false
+
+# Lab slot for model experiments: not started by default (GPU memory is
+# shared). Its preset is lab/lab.ini, writable by group localai, so the
+# operator can swap it without a PR; start/stop/restart is whitelisted.
+localai_lab_dir: "{{ localai_home }}/lab"
+localai_lab_instance: llama-server@lab.service
+localai_lab_port: 8095

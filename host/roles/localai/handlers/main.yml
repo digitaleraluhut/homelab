@@ -1,5 +1,4 @@
 ---
-# Only while the services are enabled; before the cutover nothing runs.
 - name: Restart local-ai services
   become: true
   become_user: "{{ localai_user }}"
@@ -11,4 +10,3 @@
     daemon_reload: true
     state: restarted
   loop: "{{ localai_instances }}"
-  when: localai_services_enabled

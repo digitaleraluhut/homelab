@@ -1,7 +1,8 @@
 ---
 aioperator_user: aioperator
 aioperator_home: /home/aioperator
-aioperator_groups: [adm, users, systemd-journal]
+aioperator_groups: [adm, users, systemd-journal, localai]  # localai: read /srv/localai, write lab/
+aioperator_localai_user: localai
 
 # Sudo whitelist, grouped into command aliases. A command without arguments
 # would allow ANY arguments; "" allows none.
@@ -25,15 +26,26 @@ aioperator_sudo_aliases:
   AIOPERATOR_SVC:
     - /usr/bin/systemctl restart k3s
     - /usr/bin/systemctl restart tailscaled
-  AIOPERATOR_AI:
-    - /usr/bin/systemctl --user -M jaegle@ restart llama-server@router.service
-    - /usr/bin/systemctl --user -M jaegle@ restart llama-q38@qwen3.8-dual.service
-    - /usr/bin/systemctl --user -M jaegle@ restart whisper-server@whisper.service
-    - /usr/bin/systemctl --user -M jaegle@ restart comfyui-server@comfyui.service
-    - /usr/bin/systemctl --user -M jaegle@ --no-pager status *
+  AIOPERATOR_AI:  # local AI service instances of user localai
+    - /usr/bin/systemctl --user -M localai@ restart llama-server@router.service
+    - /usr/bin/systemctl --user -M localai@ restart llama-q38@qwen3.8-dual.service
+    - /usr/bin/systemctl --user -M localai@ restart whisper-server@whisper.service
+    - /usr/bin/systemctl --user -M localai@ restart comfyui-server@comfyui.service
+    - /usr/bin/systemctl --user -M localai@ start llama-server@lab.service
+    - /usr/bin/systemctl --user -M localai@ stop llama-server@lab.service
+    - /usr/bin/systemctl --user -M localai@ restart llama-server@lab.service
+    - /usr/bin/systemctl --user -M localai@ --no-pager status *
+  # Read-only container state, run as localai. No NOEXEC: rootless podman
+  # re-executes itself. The runtime dir must match the user manager's.
+  AIOPERATOR_LOCALAI_READ:
+    - /usr/bin/env XDG_RUNTIME_DIR\=/run/user/{{ aioperator_localai_uid }} /usr/bin/podman ps -a
+    - /usr/bin/env XDG_RUNTIME_DIR\=/run/user/{{ aioperator_localai_uid }} /usr/bin/podman images
+    - /usr/bin/env XDG_RUNTIME_DIR\=/run/user/{{ aioperator_localai_uid }} /usr/bin/distrobox list
+# Each rule: "(runas) tags: aliases", rendered as "<user> ALL=<rule>".
 aioperator_sudo_rules:
-  - "NOPASSWD:NOEXEC: AIOPERATOR_DIAG"
-  - "NOPASSWD: AIOPERATOR_MAINT, AIOPERATOR_SVC, AIOPERATOR_AI"
+  - "(root) NOPASSWD:NOEXEC: AIOPERATOR_DIAG"
+  - "(root) NOPASSWD: AIOPERATOR_MAINT, AIOPERATOR_SVC, AIOPERATOR_AI"
+  - "(localai) NOPASSWD: AIOPERATOR_LOCALAI_READ"
 
 # Agent skills: name -> directory the symlink points to.
 aioperator_skills_coding_repo: https://github.com/mrsimpson/skills-coding.git
