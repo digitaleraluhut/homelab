@@ -1,0 +1,42 @@
+---
+- name: Create the archive directory for removed accounts
+  ansible.builtin.file:
+    path: "{{ accounts_archive_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Look up accounts to remove
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ item.name }}"
+    fail_key: false
+  loop: "{{ accounts_absent }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: accounts_lookup
+
+- name: Archive the home of accounts to remove  # noqa: command-instead-of-module (unarchive cannot create archives)
+  ansible.builtin.command:
+    cmd: >-
+      tar --create --gzip --file {{ accounts_archive_dir }}/{{ item.item.name }}-home.tar.gz
+      --directory {{ item.ansible_facts.getent_passwd[item.item.name][4] | dirname }}
+      {{ item.ansible_facts.getent_passwd[item.item.name][4] | basename }}
+    creates: "{{ accounts_archive_dir }}/{{ item.item.name }}-home.tar.gz"
+  loop: "{{ accounts_lookup.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.ansible_facts.getent_passwd[item.item.name] is not none
+
+# force: userdel refuses while any process runs under the UID, which
+# includes unrelated container processes that share it.
+- name: Remove accounts
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    state: absent
+    remove: true
+    force: true
+  loop: "{{ accounts_absent }}"
+  loop_control:
+    label: "{{ item.name }} ({{ item.reason }})"

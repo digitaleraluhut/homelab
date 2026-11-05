@@ -26,6 +26,7 @@ group).
 | Role | Manages |
 |---|---|
 | `runner` | ansible-core, git, the runner script, service and timer |
+| `accounts` | removes human accounts that must not exist (home archived to `/var/backups/removed-accounts` first) |
 | `aioperator` | user `aioperator`, its sudo whitelist (validated with `visudo`), `claude-remote.service`, agent-skill checkout and symlinks |
 
 `claude-remote.service` is never restarted by Ansible (that would end the

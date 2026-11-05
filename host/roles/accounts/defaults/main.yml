@@ -1,0 +1,9 @@
+---
+# Human accounts that must not exist. Their home is archived to
+# accounts_archive_dir before removal (once; the archive is kept).
+# Do not reuse their UIDs for new accounts: container processes (e.g.
+# Bitnami images run as UID 1001) show up under them.
+accounts_absent:
+  - name: dirk
+    reason: no longer needs access (owner decision 2026-11-05)
+accounts_archive_dir: /var/backups/removed-accounts
