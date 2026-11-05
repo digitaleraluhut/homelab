@@ -1,5 +1,13 @@
 # {{ ansible_managed }}
-# Sudo whitelist for the AI operator. Changes go through a reviewed PR to
+# Sudo whitelist for the AI operator. Change it only by PR to
 # digitaleraluhut/homelab (host/roles/aioperator/defaults/main.yml).
-{{ aioperator_user }} ALL=(root) NOEXEC: NOPASSWD: {{ aioperator_sudo_noexec | join(', ') }}
-{{ aioperator_user }} ALL=(root) NOPASSWD: {{ aioperator_sudo_ops | join(', ') }}
+# Note: a command without arguments allows ANY arguments in sudoers;
+#       with "" no arguments are allowed.
+{% for name, commands in aioperator_sudo_aliases.items() %}
+Cmnd_Alias {{ name }} = \
+  {{ commands | join(', \\\n  ') }}
+{% endfor %}
+
+{% for rule in aioperator_sudo_rules %}
+{{ aioperator_user }} ALL=(root) {{ rule }}
+{% endfor %}

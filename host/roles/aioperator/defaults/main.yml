@@ -3,32 +3,37 @@ aioperator_user: aioperator
 aioperator_home: /home/aioperator
 aioperator_groups: [adm, users, systemd-journal]
 
-# Read-only diagnostics. NOEXEC: these may not spawn further programs.
-aioperator_sudo_noexec:
-  - /usr/bin/ss -tlnp
-  - /usr/bin/ss -ulnp
-  - /usr/bin/ss -tulnp
-  - /usr/sbin/ufw status
-  - /usr/sbin/ufw status verbose
-  - /usr/bin/dmesg ""
-  - /usr/bin/dmesg -T
-  - /usr/local/bin/crictl ps
-  - /usr/local/bin/crictl ps -a
-  - /usr/local/bin/crictl images
-  - /usr/local/bin/crictl stats
-
-# Operations: updates and restarts of exactly these units, nothing else.
-aioperator_sudo_ops:
-  - /usr/bin/apt-get update
-  - /usr/bin/apt-get -y upgrade
-  - /usr/bin/systemctl reset-failed
-  - /usr/bin/systemctl restart k3s
-  - /usr/bin/systemctl restart tailscaled
-  - /usr/bin/systemctl --user -M jaegle@ restart llama-server@router.service
-  - /usr/bin/systemctl --user -M jaegle@ restart llama-q38@qwen3.8-dual.service
-  - /usr/bin/systemctl --user -M jaegle@ restart whisper-server@whisper.service
-  - /usr/bin/systemctl --user -M jaegle@ restart comfyui-server@comfyui.service
-  - /usr/bin/systemctl --user -M jaegle@ --no-pager status *
+# Sudo whitelist, grouped into command aliases. A command without arguments
+# would allow ANY arguments; "" allows none.
+aioperator_sudo_aliases:
+  AIOPERATOR_DIAG:  # read-only diagnostics, NOEXEC
+    - /usr/bin/ss -tlnp
+    - /usr/bin/ss -ulnp
+    - /usr/bin/ss -tulnp
+    - /usr/sbin/ufw status
+    - /usr/sbin/ufw status verbose
+    - /usr/bin/dmesg ""
+    - /usr/bin/dmesg -T
+    - /usr/local/bin/crictl ps
+    - /usr/local/bin/crictl ps -a
+    - /usr/local/bin/crictl images
+    - /usr/local/bin/crictl stats
+  AIOPERATOR_MAINT:
+    - /usr/bin/apt-get update
+    - /usr/bin/apt-get -y upgrade
+    - /usr/bin/systemctl reset-failed
+  AIOPERATOR_SVC:
+    - /usr/bin/systemctl restart k3s
+    - /usr/bin/systemctl restart tailscaled
+  AIOPERATOR_AI:
+    - /usr/bin/systemctl --user -M jaegle@ restart llama-server@router.service
+    - /usr/bin/systemctl --user -M jaegle@ restart llama-q38@qwen3.8-dual.service
+    - /usr/bin/systemctl --user -M jaegle@ restart whisper-server@whisper.service
+    - /usr/bin/systemctl --user -M jaegle@ restart comfyui-server@comfyui.service
+    - /usr/bin/systemctl --user -M jaegle@ --no-pager status *
+aioperator_sudo_rules:
+  - "NOPASSWD:NOEXEC: AIOPERATOR_DIAG"
+  - "NOPASSWD: AIOPERATOR_MAINT, AIOPERATOR_SVC, AIOPERATOR_AI"
 
 # Agent skills: name -> directory the symlink points to.
 aioperator_skills_coding_repo: https://github.com/mrsimpson/skills-coding.git
