@@ -7,6 +7,8 @@
   gather_facts: false
   vars_files:
     - ../roles/aioperator/defaults/main.yml
+  vars:
+    aioperator_localai_uid: 997   # looked up on the host at runtime
   tasks:
     - name: Render sudoers
       ansible.builtin.template:

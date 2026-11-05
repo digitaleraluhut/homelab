@@ -16,6 +16,15 @@
     group: "{{ aioperator_user }}"
     mode: "0750"
 
+- name: Look up the localai UID for the sudo whitelist
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ aioperator_localai_user }}"
+
+- name: Remember the localai UID
+  ansible.builtin.set_fact:
+    aioperator_localai_uid: "{{ ansible_facts.getent_passwd[aioperator_localai_user][1] }}"
+
 # visudo validates before the file is moved into place, so a broken template
 # can never lock sudo.
 - name: Install the operator sudo whitelist

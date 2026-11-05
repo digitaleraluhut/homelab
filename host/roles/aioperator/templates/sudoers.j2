@@ -9,5 +9,5 @@ Cmnd_Alias {{ name }} = \
 {% endfor %}
 
 {% for rule in aioperator_sudo_rules %}
-{{ aioperator_user }} ALL=(root) {{ rule }}
+{{ aioperator_user }} ALL={{ rule }}
 {% endfor %}

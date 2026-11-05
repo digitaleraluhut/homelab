@@ -7,7 +7,7 @@
   roles:
     - role: runner
       tags: [runner]
-    - role: aioperator
-      tags: [aioperator]
     - role: localai
       tags: [localai]
+    - role: aioperator
+      tags: [aioperator]
