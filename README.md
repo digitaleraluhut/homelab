@@ -42,6 +42,7 @@ Internet → Cloudflare Edge → Encrypted Tunnel → k3s Cluster → Your Apps
 homelab/                          ← Pulumi project (root)
 ├── src/index.ts                 ← Orchestrator entry point
 ├── Pulumi.yaml                  ← Pulumi config
+├── host/                        ← Ansible: node config outside Kubernetes (pulled by the host)
 ├── package.json                 ← Dependencies & scripts
 │
 └── packages/                    ← Reusable libraries
@@ -129,6 +130,7 @@ Or extend `packages/core/infrastructure/` for reusable modules.
 - **[OAuth2-Proxy Examples](./docs/OAUTH2_PROXY_EXAMPLES.md)** - Step-by-step usage examples
 - **[ADRs](./docs/adr/)** - Architecture decisions
 - **[How-To Guides](./docs/howto/)** - Setup, deployment, operations
+- **[Host configuration](./docs/howto/manage-host-config.md)** - Ansible for the node itself ([ADR-018](./docs/adr/018-host-configuration-ansible-pull.md))
 - **[Security Review](./docs/CRITICAL-REVIEW.md)** - Security assessment
 
 ## Security & Secrets
