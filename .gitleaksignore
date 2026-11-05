@@ -1,0 +1,10 @@
+# Reviewed gitleaks findings in history (format: commit:file:rule:line).
+# Add only after checking each finding; changes need CODEOWNERS review.
+
+# Longhorn UI basic-auth htpasswd (admin/longhorn123, documented default). Removed
+# together with the Longhorn UI ingress in d28624b; UI is port-forward only since.
+ab2e323a9ae96da782c242ae2a6a91667851aec3:src/index.ts:generic-api-key:76
+275f6bbf35983c3260075855c8b5d3677a1e12f7:src/index.ts:generic-api-key:81
+
+# Placeholder in docs: "Authorization: Bearer YOUR_API_TOKEN"
+e21d2f5e60fdab0efdec2b44e1cbdbc79bbe7b2c:docs/howto/setup-cluster.md:curl-auth-header:128
