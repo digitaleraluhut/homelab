@@ -64,7 +64,7 @@
     group: "{{ localai_user }}"
     mode: "0644"
     content: |
-      # {{ ansible_managed }}
+      # Managed by Ansible (digitaleraluhut/homelab host/), do not edit.
       [containers]
       log_driver = "k8s-file"
 
@@ -81,16 +81,25 @@
 
 # The container wrappers read presets from ~/.config/llama-cpp (container home
 # = host home). Without this, preset changes only arrive when a container is
-# recreated.
+# recreated. File by file: a remote_src directory copy reports "changed" on
+# every run, which would restart the services hourly.
+- name: Find presets in the checkout
+  ansible.builtin.find:
+    paths: "{{ localai_checkout }}/configs"
+    patterns: ["*.ini", "*.jinja"]
+  register: localai_presets
+
 - name: Sync presets into the container config directory
   ansible.builtin.copy:
-    src: "{{ localai_checkout }}/configs/"
-    dest: "{{ localai_home }}/.config/llama-cpp/"
+    src: "{{ item.path }}"
+    dest: "{{ localai_home }}/.config/llama-cpp/{{ item.path | basename }}"
     remote_src: true
     owner: "{{ localai_user }}"
     group: "{{ localai_user }}"
     mode: "0640"
-    directory_mode: "0750"
+  loop: "{{ localai_presets.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
   notify: Restart local-ai services
 
 - name: Install unit templates
@@ -141,7 +150,7 @@
     group: "{{ localai_user }}"
     mode: "0644"
     content: |
-      # {{ ansible_managed }}
+      # Managed by Ansible (digitaleraluhut/homelab host/), do not edit.
       [Service]
       Environment=LLAMA_CONFIG_DIR={{ localai_lab_dir }}
       Environment=LLAMA_SERVER_PORT={{ localai_lab_port }}
