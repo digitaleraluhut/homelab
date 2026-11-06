@@ -10,7 +10,7 @@ localai_subid_count: 65536
 
 localai_repo: https://github.com/digitaleraluhut/local-ai.git
 # Pinned: a merge in local-ai reaches the host only after this is bumped here.
-localai_ref: ea13b91f87c414daa15d2c73ae7d28ea6ebdfc73
+localai_ref: 36d627acc747fabda067b92b06ce3828f3024c2a
 localai_checkout: "{{ localai_home }}/local-ai"
 
 # Data the wrappers expect under $HOME (moved there once by hand).
