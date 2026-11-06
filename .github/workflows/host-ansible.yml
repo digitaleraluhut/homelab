@@ -44,3 +44,6 @@ jobs:
 
       - name: Render and validate sudoers
         run: ansible-playbook tests/render-sudoers.yml
+
+      - name: Timeshift excludes (adds missing, idempotent)
+        run: ansible-playbook tests/timeshift-excludes.yml

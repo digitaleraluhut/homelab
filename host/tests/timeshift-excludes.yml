@@ -1,0 +1,79 @@
+---
+# Check: the timeshift role adds missing excludes, keeps the owner's own
+# entries and keys, and changes nothing on a second run.
+# Run: ansible-playbook tests/timeshift-excludes.yml
+- name: Ensure Timeshift excludes on a sample config
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../roles/timeshift/defaults/main.yml
+  vars:
+    test_dir: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/timeshift-test"
+    test_config: "{{ test_dir }}/timeshift.json"
+  tasks:
+    - name: Create the test directory
+      ansible.builtin.file:
+        path: "{{ test_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Write a sample config in Timeshift's own format
+      ansible.builtin.copy:
+        dest: "{{ test_config }}"
+        mode: "0644"
+        content: |
+          {
+            "backup_device_uuid" : "00000000-0000-0000-0000-000000000000",
+            "schedule_daily" : "true",
+            "count_daily" : "5",
+            "snapshot_size" : "60534399635",
+            "exclude" : [
+              "/home/jaegle/**",
+              "/root/**",
+              "/srv/localai/models/**"
+            ],
+            "exclude-apps" : []
+          }
+
+    - name: First run
+      ansible.builtin.include_role:
+        name: timeshift
+      vars:
+        timeshift_config: "{{ test_config }}"
+        timeshift_config_owner: "{{ lookup('env', 'USER') }}"
+
+    - name: Remember the result
+      ansible.builtin.stat:
+        path: "{{ test_config }}"
+      register: test_first
+
+    - name: Second run
+      ansible.builtin.include_role:
+        name: timeshift
+      vars:
+        timeshift_config: "{{ test_config }}"
+        timeshift_config_owner: "{{ lookup('env', 'USER') }}"
+
+    - name: Read the result
+      ansible.builtin.slurp:
+        src: "{{ test_config }}"
+      register: test_result
+
+    - name: Remember the second result
+      ansible.builtin.stat:
+        path: "{{ test_config }}"
+      register: test_second
+
+    - name: Check excludes, kept settings and idempotence
+      vars:
+        test_settings: "{{ test_result.content | b64decode | from_json }}"
+      ansible.builtin.assert:
+        that:
+          - timeshift_excludes | difference(test_settings.exclude) | length == 0
+          - "'/home/jaegle/**' in test_settings.exclude"
+          - "'/root/**' in test_settings.exclude"
+          - test_settings.exclude | length == (test_settings.exclude | unique | length)
+          - test_settings.snapshot_size == '60534399635'
+          - test_settings['exclude-apps'] == []
+          - test_first.stat.checksum == test_second.stat.checksum

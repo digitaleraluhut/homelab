@@ -1,0 +1,20 @@
+---
+# Timeshift snapshots of / land on the same disk. Data that is only pulled
+# (downloads, container images, git checkouts) must not be in them: on
+# 2026-11-06 the first daily snapshot after moving the models to
+# /srv/localai copied them again and filled the disk.
+# The role only adds missing entries; the owner's own entries stay.
+timeshift_config: /etc/timeshift/timeshift.json
+timeshift_config_owner: root
+timeshift_excludes:
+  # role localai: model downloads, rootless podman storage, caches, pinned checkout
+  - /srv/localai/models/**
+  - /srv/localai/.local/share/containers/**
+  - /srv/localai/.cache/**
+  - /srv/localai/local-ai/**
+  # k3s container images
+  - /var/lib/rancher/k3s/agent/containerd/**
+  # role runner: checkout of this repo
+  - /var/lib/homelab-host/checkout/**
+  # role aioperator: working checkouts and agent state (owner decision 2026-11-06)
+  - /home/aioperator/**

@@ -1,0 +1,37 @@
+---
+# Timeshift rewrites its config after every run (snapshot_size and others), so
+# the file is not templated: read it, and write it only if an exclude is missing.
+- name: Look for the Timeshift config
+  ansible.builtin.stat:
+    path: "{{ timeshift_config }}"
+  register: timeshift_config_stat
+
+- name: Ensure the Timeshift excludes
+  when: timeshift_config_stat.stat.exists
+  block:
+    - name: Read the Timeshift config
+      ansible.builtin.slurp:
+        src: "{{ timeshift_config }}"
+      register: timeshift_config_raw
+
+    - name: Find missing excludes
+      ansible.builtin.set_fact:
+        timeshift_settings: "{{ timeshift_config_raw.content | b64decode | from_json }}"
+        timeshift_missing: >-
+          {{ timeshift_excludes
+             | reject('in', (timeshift_config_raw.content | b64decode | from_json).exclude | default([]))
+             | list }}
+
+    - name: Add missing excludes
+      when: timeshift_missing | length > 0
+      ansible.builtin.copy:
+        dest: "{{ timeshift_config }}"
+        content: >-
+          {{ timeshift_settings
+             | combine({'exclude': (timeshift_settings.exclude | default([])) + timeshift_missing})
+             | to_nice_json(indent=2, sort_keys=false) }}
+        owner: "{{ timeshift_config_owner }}"
+        group: "{{ timeshift_config_owner }}"
+        mode: "0644"
+        backup: true
+        validate: /usr/bin/python3 -m json.tool %s

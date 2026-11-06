@@ -11,3 +11,5 @@
       tags: [localai]
     - role: aioperator
       tags: [aioperator]
+    - role: timeshift
+      tags: [timeshift]
