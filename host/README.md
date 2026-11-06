@@ -6,7 +6,7 @@ Why: [ADR-018](../docs/adr/018-host-configuration-ansible-pull.md). Operating it
 
 ## How it is applied
 
-A root systemd timer (`homelab-host-apply.timer`, hourly) runs
+A root systemd timer (`homelab-host-apply.timer`, every 10 minutes) runs
 `/usr/local/sbin/homelab-host-apply`:
 
 1. shallow-fetches `main` of this repo into `/var/lib/homelab-host/checkout`,

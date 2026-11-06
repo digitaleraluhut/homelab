@@ -8,7 +8,7 @@ for the reasoning.
 
 1. Change roles or variables under `host/` in a branch and open a PR. CI runs
    `ansible-lint`, a syntax check, and renders plus validates the sudoers file.
-2. After merge, the hourly timer `homelab-host-apply.timer` fetches `main` and
+2. After merge, the timer (every 10 minutes) `homelab-host-apply.timer` fetches `main` and
    runs `host/site.yml`.
 3. Read the result: `journalctl -u homelab-host-apply` (group `systemd-journal`).
 

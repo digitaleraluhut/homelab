@@ -5,7 +5,7 @@ Description=Periodically apply homelab host configuration
 [Timer]
 OnBootSec=5min
 OnCalendar={{ runner_calendar }}
-RandomizedDelaySec=10min
+RandomizedDelaySec={{ runner_randomized_delay }}
 Persistent=true
 
 [Install]

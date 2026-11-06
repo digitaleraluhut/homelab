@@ -46,8 +46,8 @@ CODEOWNERS-protected, including the operator's sudo whitelist.
 ## Consequences
 
 - Host changes are PRs with CI (`ansible-lint`, syntax check, `visudo`
-  validation of the rendered sudoers file). They reach the host within about an
-  hour of merge.
+  validation of the rendered sudoers file). They reach the host within about ten
+  minutes of merge.
 - Hand edits to managed files are reverted by the next run.
 - Bootstrapping a reinstalled host takes three commands (see
   [manage-host-config](../howto/manage-host-config.md)).
