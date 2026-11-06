@@ -60,3 +60,9 @@ aioperator_skills:
 aioperator_skill_dirs:
   - "{{ aioperator_home }}/.agents/skills"
   - "{{ aioperator_home }}/.claude/skills"
+
+# Claude Code permissions for the operator, as root-owned managed settings the
+# operator cannot change itself. GitHub still enforces code-owner review, so
+# "gh pr merge" only succeeds where no owner review is required.
+aioperator_claude_allow:
+  - "Bash(gh pr merge:*)"

@@ -27,7 +27,7 @@ group).
 | Role | Manages |
 |---|---|
 | `runner` | ansible-core, git, the runner script, service and timer |
-| `aioperator` | user `aioperator`, its sudo whitelist (validated with `visudo`), `claude-remote.service`, agent-skill checkout and symlinks |
+| `aioperator` | user `aioperator`, its sudo whitelist (validated with `visudo`), `claude-remote.service`, agent-skill checkout and symlinks, Claude Code managed settings `/etc/claude-code/managed-settings.json` (operator permissions) |
 | `localai` | system user `localai` (home `/srv/localai`, GPU groups, subuid range, linger), pinned `local-ai` checkout, presets synced to `~/.config/llama-cpp`, unit templates and drop-ins, service instances, lab slot `llama-server@lab` (preset `lab/lab.ini`, port 8095, not started by default) |
 
 `claude-remote.service` is never restarted by Ansible (that would end the
