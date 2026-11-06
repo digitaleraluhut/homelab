@@ -2,4 +2,7 @@
 runner_repo: https://github.com/digitaleraluhut/homelab.git
 runner_branch: main
 runner_state_dir: /var/lib/homelab-host
-runner_calendar: hourly
+# Every 10 minutes while the host roles are still being iterated on;
+# runs without changes restart nothing.
+runner_calendar: "*:0/10"
+runner_randomized_delay: 1min
