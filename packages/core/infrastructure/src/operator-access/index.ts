@@ -39,6 +39,9 @@ export const operatorClusterReadRules: k8s.types.input.rbac.v1.PolicyRule[] = [
     verbs: READ,
   },
   { apiGroups: ["apiextensions.k8s.io"], resources: ["customresourcedefinitions"], verbs: READ },
+  // Runtime classes (e.g. Kata for microVM runners) and scheduling priorities.
+  { apiGroups: ["node.k8s.io"], resources: ["runtimeclasses"], verbs: READ },
+  { apiGroups: ["scheduling.k8s.io"], resources: ["priorityclasses"], verbs: READ },
   { apiGroups: ["apiregistration.k8s.io"], resources: ["apiservices"], verbs: READ },
   { apiGroups: ["metrics.k8s.io"], resources: ["nodes", "pods"], verbs: READ },
   {

@@ -48,4 +48,15 @@ describe("createOperatorAccess", () => {
       if (r.apiGroups.includes("")) expect(r.resources).not.toContain("*");
     }
   });
+
+  it("can read runtime and priority classes (runner/runtime diagnostics)", () => {
+    const role = created.find(
+      (c) => c.name === "operator-access-cluster-read" && c.type.endsWith("ClusterRole")
+    );
+    const rules = role?.inputs.rules as Rule[];
+    const can = (group: string, resource: string) =>
+      rules.some((r) => r.apiGroups.includes(group) && r.resources.includes(resource));
+    expect(can("node.k8s.io", "runtimeclasses")).toBe(true);
+    expect(can("scheduling.k8s.io", "priorityclasses")).toBe(true);
+  });
 });
