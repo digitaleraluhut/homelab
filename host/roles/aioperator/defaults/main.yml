@@ -35,6 +35,10 @@ aioperator_sudo_aliases:
     - /usr/bin/systemctl --user -M localai@ stop llama-server@lab.service
     - /usr/bin/systemctl --user -M localai@ restart llama-server@lab.service
     - /usr/bin/systemctl --user -M localai@ --no-pager status *
+  # Mints a 1h GitHub App installation token; no arguments allowed. No
+  # NOEXEC: the helper runs openssl to sign the App JWT.
+  AIOPERATOR_GITHUB:
+    - /usr/local/sbin/homelab-operator-github-token ""
   # Read-only container state, run as localai. No NOEXEC: rootless podman
   # re-executes itself. The runtime dir must match the user manager's.
   AIOPERATOR_LOCALAI_READ:
@@ -44,7 +48,7 @@ aioperator_sudo_aliases:
 # Each rule: "(runas) tags: aliases", rendered as "<user> ALL=<rule>".
 aioperator_sudo_rules:
   - "(root) NOPASSWD:NOEXEC: AIOPERATOR_DIAG"
-  - "(root) NOPASSWD: AIOPERATOR_MAINT, AIOPERATOR_SVC, AIOPERATOR_AI"
+  - "(root) NOPASSWD: AIOPERATOR_MAINT, AIOPERATOR_SVC, AIOPERATOR_AI, AIOPERATOR_GITHUB"
   - "(localai) NOPASSWD: AIOPERATOR_LOCALAI_READ"
 
 # Agent skills: name -> directory the symlink points to.
@@ -66,3 +70,26 @@ aioperator_skill_dirs:
 # "gh pr merge" only succeeds where no owner review is required.
 aioperator_claude_allow:
   - "Bash(gh pr merge:*)"
+
+# GitHub access through an org-owned GitHub App instead of a user account.
+# The owner places the App's private key and IDs in this directory by hand
+# (never in git: this repository is public):
+#   private-key.pem  root:root 0600
+#   app.env          root:root 0644  APP_ID=, INSTALLATION_ID=, BOT_LOGIN=, BOT_USER_ID=
+# Until app.env exists, git and gh keep using the previous gh login.
+aioperator_github_app_dir: /etc/homelab/operator-github-app
+aioperator_github_repositories: [homelab, homelab-apps, local-ai, homelab-wiki]
+# Requested per token; never more than the App installation grants.
+# Deliberately no "workflows": GitHub then refuses any push that adds or
+# changes .github/workflows/, even on branches, so only reviewed workflow
+# code can run. Workflow changes come as patches the owner pushes.
+aioperator_github_permissions:
+  contents: write
+  pull_requests: write
+  issues: write
+  actions: read
+  checks: read
+  statuses: read
+# Used while the App is not configured.
+aioperator_git_fallback_name: Olivers AI
+aioperator_git_fallback_email: mrsimpson-ai@beimir.net

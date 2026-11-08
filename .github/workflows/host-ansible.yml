@@ -45,5 +45,8 @@ jobs:
       - name: Render and validate sudoers
         run: ansible-playbook tests/render-sudoers.yml
 
+      - name: Render GitHub App helpers and derive the git identity
+        run: ansible-playbook tests/github-app.yml -e out="$RUNNER_TEMP/github-app"
+
       - name: Timeshift excludes (adds missing, idempotent)
         run: ansible-playbook tests/timeshift-excludes.yml

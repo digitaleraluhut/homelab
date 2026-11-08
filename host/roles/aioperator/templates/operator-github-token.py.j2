@@ -1,0 +1,83 @@
+#!/usr/bin/python3
+# {{ ansible_managed }}
+"""GitHub credentials for the AI operator, from the GitHub App.
+
+  operator-github-token                 print a valid installation token
+  operator-github-token git-credential  git credential helper ("get" only)
+  operator-github-token identity        print "name<TAB>email" of the App bot
+
+Tokens are minted by the root-only helper (sudo) and cached for their
+lifetime minus a margin in ~/.cache/operator-github/token.json (0600).
+"""
+import datetime
+import json
+import os
+import subprocess
+import sys
+
+MINT = os.environ.get("OPERATOR_GITHUB_MINT", "sudo -n /usr/local/sbin/homelab-operator-github-token").split()
+APP_ENV = os.path.join(os.environ.get("HOMELAB_GITHUB_APP_DIR", {{ aioperator_github_app_dir | to_json }}), "app.env")
+CACHE = os.path.expanduser("~/.cache/operator-github/token.json")
+MARGIN = datetime.timedelta(minutes=10)
+
+
+def cached_token():
+    try:
+        with open(CACHE) as f:
+            data = json.load(f)
+        expires = datetime.datetime.fromisoformat(data["expires_at"].replace("Z", "+00:00"))
+        if expires - datetime.datetime.now(datetime.timezone.utc) > MARGIN:
+            return data["token"]
+    except (OSError, ValueError, KeyError):
+        pass
+    return None
+
+
+def token() -> str:
+    tok = cached_token()
+    if tok:
+        return tok
+    out = subprocess.run(MINT, capture_output=True, text=True)
+    if out.returncode != 0:
+        sys.stderr.write(out.stderr)
+        sys.exit(1)
+    data = json.loads(out.stdout)
+    os.makedirs(os.path.dirname(CACHE), mode=0o700, exist_ok=True)
+    fd = os.open(CACHE + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(data, f)
+    os.replace(CACHE + ".tmp", CACHE)
+    return data["token"]
+
+
+def identity() -> str:
+    env = {}
+    with open(APP_ENV) as f:
+        for line in f:
+            if "=" in line and not line.lstrip().startswith("#"):
+                key, value = line.strip().split("=", 1)
+                env[key] = value
+    login, user_id = env["BOT_LOGIN"], env["BOT_USER_ID"]
+    return f"{login}\t{user_id}+{login}@users.noreply.github.com"
+
+
+def main() -> int:
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd == "":
+        print(token())
+    elif cmd == "git-credential":
+        action = sys.argv[2] if len(sys.argv) > 2 else ""
+        request = dict(l.split("=", 1) for l in sys.stdin.read().splitlines() if "=" in l)
+        if action == "get" and request.get("host") == "github.com":
+            print("username=x-access-token")
+            print(f"password={token()}")
+    elif cmd == "identity":
+        print(identity())
+    else:
+        print(__doc__, file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

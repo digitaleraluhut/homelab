@@ -36,6 +36,57 @@
     mode: "0440"
     validate: /usr/sbin/visudo -cf %s
 
+- name: Create the GitHub App config directory (contents placed by the owner)
+  ansible.builtin.file:
+    path: "{{ aioperator_github_app_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the GitHub App token minting helper (root only)
+  ansible.builtin.template:
+    src: homelab-operator-github-token.py.j2
+    dest: /usr/local/sbin/homelab-operator-github-token
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the operator's GitHub token and credential helper
+  ansible.builtin.template:
+    src: operator-github-token.py.j2
+    dest: /usr/local/bin/operator-github-token
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create the operator's local bin directory
+  ansible.builtin.file:
+    path: "{{ aioperator_home }}/.local/bin"
+    state: directory
+    owner: "{{ aioperator_user }}"
+    group: "{{ aioperator_user }}"
+    mode: "0755"
+
+- name: Install the gh wrapper that uses the App token
+  ansible.builtin.template:
+    src: gh-wrapper.sh.j2
+    dest: "{{ aioperator_home }}/.local/bin/gh"
+    owner: "{{ aioperator_user }}"
+    group: "{{ aioperator_user }}"
+    mode: "0755"
+
+- name: Derive the operator's git identity
+  ansible.builtin.include_tasks: git-identity.yml
+
+- name: Install the operator's git configuration
+  ansible.builtin.template:
+    src: gitconfig.j2
+    dest: "{{ aioperator_home }}/.gitconfig"
+    owner: "{{ aioperator_user }}"
+    group: "{{ aioperator_user }}"
+    mode: "0644"
+
 - name: Create the Claude Code managed settings directory
   ansible.builtin.file:
     path: /etc/claude-code
