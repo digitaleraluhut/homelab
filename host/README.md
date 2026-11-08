@@ -52,4 +52,9 @@ ansible-lint
 ansible-playbook site.yml --syntax-check
 ansible-playbook tests/render-sudoers.yml   # renders sudoers, validates with visudo
 ansible-playbook tests/timeshift-excludes.yml   # timeshift role on a sample config
+ansible-playbook tests/github-app.yml -e out=$(mktemp -d)   # GitHub App helpers, git identity
 ```
+
+Every new `copy` or `template` task must be **executed** in a test playbook
+before the PR (render into a temp dir). Lint and syntax checks do not catch
+undefined variables such as `ansible_managed` in `copy` content.
