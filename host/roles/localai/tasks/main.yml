@@ -77,7 +77,9 @@
     dest: "{{ localai_checkout }}"
     version: "{{ localai_ref }}"
     force: true
-  notify: Restart local-ai services
+  notify:
+    - Run model sync
+    - Restart local-ai services
 
 # The container wrappers read presets from ~/.config/llama-cpp (container home
 # = host home). Without this, preset changes only arrive when a container is
@@ -154,6 +156,54 @@
       [Service]
       Environment=LLAMA_CONFIG_DIR={{ localai_lab_dir }}
       Environment=LLAMA_SERVER_PORT={{ localai_lab_port }}
+
+- name: Install the model sync unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/localai-model-sync.service
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (digitaleraluhut/homelab host/), do not edit.
+      [Unit]
+      Description=Download missing local-ai models (models/catalog.yaml)
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      Type=oneshot
+      User={{ localai_user }}
+      ExecStart=/usr/bin/python3 {{ localai_checkout }}/scripts/model_catalog.py sync --models-dir {{ localai_home }}/models
+      TimeoutStartSec=infinity
+      Nice=10
+      IOSchedulingClass=idle
+  notify: Run model sync
+
+- name: Install the model sync timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/localai-model-sync.timer
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (digitaleraluhut/homelab host/), do not edit.
+      [Unit]
+      Description=Periodic local-ai model sync
+
+      [Timer]
+      OnCalendar={{ localai_model_sync_timer }}
+      Persistent=true
+      RandomizedDelaySec=1h
+
+      [Install]
+      WantedBy=timers.target
+
+- name: Enable the model sync timer
+  ansible.builtin.systemd_service:
+    name: localai-model-sync.timer
+    enabled: true
+    state: started
+    daemon_reload: true
 
 - name: Flush handlers before managing the services
   ansible.builtin.meta: flush_handlers
