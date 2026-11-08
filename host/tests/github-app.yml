@@ -1,0 +1,62 @@
+---
+# Renders the GitHub App helpers with the role defaults into a scratch
+# directory and derives the git identity, with and without app.env.
+# Run: ansible-playbook tests/github-app.yml -e out=/some/tmp/dir
+- name: Render the operator GitHub App helpers
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../roles/aioperator/defaults/main.yml
+  tasks:
+    # set_fact: vars_files would win over play vars.
+    - name: Point the App config at the scratch directory
+      ansible.builtin.set_fact:
+        aioperator_github_app_dir: "{{ out }}/app"
+
+    - name: Create the scratch directories
+      ansible.builtin.file:
+        path: "{{ out }}/app"
+        state: directory
+        mode: "0755"
+
+    - name: Render scripts
+      ansible.builtin.template:
+        src: "../roles/aioperator/templates/{{ item.src }}"
+        dest: "{{ out }}/{{ item.dest }}"
+        mode: "0755"
+      loop:
+        - {src: homelab-operator-github-token.py.j2, dest: mint}
+        - {src: operator-github-token.py.j2, dest: operator-github-token}
+        - {src: gh-wrapper.sh.j2, dest: gh}
+
+    - name: Derive identity without app.env
+      ansible.builtin.include_tasks: ../roles/aioperator/tasks/git-identity.yml
+
+    - name: Check the fallback identity
+      ansible.builtin.assert:
+        that:
+          - aioperator_git_name == aioperator_git_fallback_name
+          - aioperator_git_credential_helper == '!/usr/bin/gh auth git-credential'
+
+    - name: Write a sample app.env
+      ansible.builtin.copy:
+        dest: "{{ out }}/app/app.env"
+        mode: "0644"
+        content: "APP_ID=12345\nINSTALLATION_ID=678\nBOT_LOGIN=homelab-operator[bot]\nBOT_USER_ID=999\n"
+
+    - name: Derive identity with app.env
+      ansible.builtin.include_tasks: ../roles/aioperator/tasks/git-identity.yml
+
+    - name: Check the App identity
+      ansible.builtin.assert:
+        that:
+          - aioperator_git_name == 'homelab-operator[bot]'
+          - aioperator_git_email == '999+homelab-operator[bot]@users.noreply.github.com'
+          - aioperator_git_credential_helper == '!/usr/local/bin/operator-github-token git-credential'
+
+    - name: Render gitconfig
+      ansible.builtin.template:
+        src: ../roles/aioperator/templates/gitconfig.j2
+        dest: "{{ out }}/gitconfig"
+        mode: "0644"

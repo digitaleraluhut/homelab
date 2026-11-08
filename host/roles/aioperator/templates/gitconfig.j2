@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+[user]
+	name = {{ aioperator_git_name }}
+	email = {{ aioperator_git_email }}
+[credential "https://github.com"]
+	helper =
+	helper = {{ aioperator_git_credential_helper }}
+[credential "https://gist.github.com"]
+	helper =
+	helper = {{ aioperator_git_credential_helper }}

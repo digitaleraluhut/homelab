@@ -1,0 +1,22 @@
+---
+# Git identity and credential helper: the GitHub App bot once app.env exists,
+# the previous gh login before that. Included by main.yml and tests/.
+- name: Read the GitHub App identity, if configured
+  ansible.builtin.slurp:
+    src: "{{ aioperator_github_app_dir }}/app.env"
+  register: aioperator_github_app_env
+  failed_when: false
+
+- name: Derive the operator's git identity and credential helper
+  vars:
+    app_env: >-
+      {{ dict((aioperator_github_app_env.content | default('') | b64decode).splitlines()
+              | select('search', '=') | map('split', '=', 1)) }}
+  ansible.builtin.set_fact:
+    aioperator_git_name: "{{ app_env.BOT_LOGIN | default(aioperator_git_fallback_name) }}"
+    aioperator_git_email: >-
+      {{ (app_env.BOT_USER_ID ~ '+' ~ app_env.BOT_LOGIN ~ '@users.noreply.github.com')
+         if ('BOT_LOGIN' in app_env and 'BOT_USER_ID' in app_env) else aioperator_git_fallback_email }}
+    aioperator_git_credential_helper: >-
+      {{ '!/usr/local/bin/operator-github-token git-credential'
+         if ('APP_ID' in app_env) else '!/usr/bin/gh auth git-credential' }}

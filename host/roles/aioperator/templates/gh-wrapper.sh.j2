@@ -1,0 +1,8 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# gh with the operator's GitHub App token. Falls back to gh's own login while
+# the App is not configured on this host.
+if token=$(/usr/local/bin/operator-github-token 2>/dev/null); then
+  GH_TOKEN=$token exec /usr/bin/gh "$@"
+fi
+exec /usr/bin/gh "$@"
