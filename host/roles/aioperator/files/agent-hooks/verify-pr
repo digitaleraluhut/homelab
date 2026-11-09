@@ -23,13 +23,10 @@ def run(*args, cwd=None):
 
 
 HANDOFF = (
-    "GitHub refused the push because it touches .github/workflows/ and the operator's App has no "
-    "`workflows` permission (deliberate). Do not retry and do not ask for that permission. Instead: "
-    "remove the workflow change from your branch and push the rest; put the workflow file(s) into "
-    "/tmp/aioperator-handoff/<repo>/ and add a line per file to /tmp/aioperator-handoff/handoff.tsv "
-    "(tab-separated: repo, existing PR branch or new:<branch>, file path relative to the handoff dir, "
-    "commit message); then mention the pending handoff in the PR description and tell the owner to run "
-    "homelab/scripts/apply-operator-handoff.sh. See AGENTS.md rule 6."
+    "GitHub refused the push: it touches .github/workflows/ and the operator's App deliberately has no "
+    "`workflows` permission. Do not retry and do not ask for that permission. Use the `workflow-handoff` "
+    "skill: push the rest without the workflow change, hand the workflow file(s) over as data in "
+    "/tmp/aioperator-handoff/ (handoff.tsv), and tell the owner."
 )
 
 
