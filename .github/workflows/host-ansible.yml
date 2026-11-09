@@ -50,3 +50,12 @@ jobs:
 
       - name: Timeshift excludes (adds missing, idempotent)
         run: ansible-playbook tests/timeshift-excludes.yml
+
+      - name: gitleaks and hook activation
+        run: ansible-playbook tests/git-hooks.yml -e out="$RUNNER_TEMP/git-hooks" -e ansible_become=false
+
+      - name: Skills copied from skills/
+        run: ansible-playbook tests/repo-skills.yml -e out="$RUNNER_TEMP/repo-skills"
+
+      - name: Workspace instructions (AGENTS.md)
+        run: ansible-playbook tests/workspace-agents.yml -e out="$RUNNER_TEMP/workspace-agents"
