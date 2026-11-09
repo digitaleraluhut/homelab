@@ -28,7 +28,6 @@ aioperator_sudo_aliases:
     - /usr/bin/systemctl restart tailscaled
   AIOPERATOR_AI:  # local AI service instances of user localai
     - /usr/bin/systemctl --user -M localai@ restart llama-server@router.service
-    - /usr/bin/systemctl --user -M localai@ restart llama-q38@qwen3.8-dual.service
     - /usr/bin/systemctl --user -M localai@ restart whisper-server@whisper.service
     - /usr/bin/systemctl --user -M localai@ restart comfyui-server@comfyui.service
     - /usr/bin/systemctl --user -M localai@ start llama-server@lab.service

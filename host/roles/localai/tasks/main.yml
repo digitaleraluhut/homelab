@@ -157,6 +157,63 @@
       Environment=LLAMA_CONFIG_DIR={{ localai_lab_dir }}
       Environment=LLAMA_SERVER_PORT={{ localai_lab_port }}
 
+- name: Create the router drop-in directory
+  ansible.builtin.file:
+    path: "{{ localai_home }}/.config/systemd/user/{{ localai_router_instance }}.d"
+    state: directory
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0755"
+
+# One list decides which models are in GPU memory: localai_resident_models.
+# The router never loads anything on its own (autoload is a global per-router
+# flag, there is no per-model switch); the loader unit below loads the list
+# after every router start. Other models load only on an explicit request
+# (POST /models/load or ?autoload=true).
+- name: Disable on-demand model autoload on the router
+  ansible.builtin.copy:
+    dest: "{{ localai_home }}/.config/systemd/user/{{ localai_router_instance }}.d/no-autoload.conf"
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0644"
+    content: |
+      # Managed by Ansible (digitaleraluhut/homelab host/), do not edit.
+      [Service]
+      Environment=LLAMA_NO_AUTOLOAD=1
+  notify: Restart local-ai services
+
+- name: Install the resident-model loader
+  ansible.builtin.copy:
+    src: localai-load-models
+    dest: "{{ localai_home }}/.local/bin/localai-load-models"
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0755"
+  notify: Restart local-ai services
+
+- name: Install the resident-model loader unit
+  ansible.builtin.copy:
+    dest: "{{ localai_home }}/.config/systemd/user/{{ localai_resident_unit }}"
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0644"
+    content: |
+      # Managed by Ansible (digitaleraluhut/homelab host/), do not edit.
+      [Unit]
+      Description=Load the resident models into the llama router
+      After={{ localai_router_instance }}
+      PartOf={{ localai_router_instance }}
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      TimeoutStartSec=900
+      ExecStart={{ localai_home }}/.local/bin/localai-load-models {{ localai_router_port }} {{ localai_resident_models | join(' ') }}
+
+      [Install]
+      WantedBy={{ localai_router_instance }}
+  notify: Restart local-ai services
+
 - name: Install the model sync unit
   ansible.builtin.copy:
     dest: /etc/systemd/system/localai-model-sync.service
