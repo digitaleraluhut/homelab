@@ -189,8 +189,8 @@ The homelab is operated by an AI agent under the owner's review.
 - **local-ai:** PR to `local-ai` → merge → takes effect only after the pin `localai_ref` in `homelab` is bumped (owner review).
 
 **Workflow changes.** The App has no `workflows` permission. That is deliberate: otherwise a pushed branch could carry its own workflow and run it with self-chosen `GITHUB_TOKEN` rights, without any review. Instead:
-1. The operator puts the workflow files and an `apply-workflows.sh` into `/tmp/aioperator-handoff/` on the host.
-2. The owner runs `bash /tmp/aioperator-handoff/apply-workflows.sh`. The script commits the files onto the matching PR branches and pushes them with the owner's credentials. It merges nothing.
+1. The operator puts the workflow files and a manifest `handoff.tsv` into `/tmp/aioperator-handoff/` on the host. These are data, not code.
+2. The owner runs `scripts/apply-operator-handoff.sh`, which is reviewed and lives in this repo. For each entry it shows the diff and asks. It then commits onto an open PR branch, or onto a new branch with a new PR. It only writes `.github/workflows/*.yml` and never merges.
 3. The owner reviews and merges the PRs as usual.
 
 **Enforced, not just agreed:**
