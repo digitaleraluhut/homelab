@@ -95,13 +95,22 @@
     group: root
     mode: "0755"
 
-- name: Install Claude Code managed settings (operator permissions)
+- name: Install the Claude Code hook scripts (root-owned)
+  ansible.builtin.copy:
+    src: agent-hooks/
+    dest: "{{ aioperator_claude_hooks_dir }}/"
+    owner: root
+    group: root
+    mode: "0755"
+    directory_mode: "0755"
+
+- name: Install Claude Code managed settings (operator permissions and hooks)
   ansible.builtin.copy:
     dest: /etc/claude-code/managed-settings.json
     owner: root
     group: root
     mode: "0644"
-    content: "{{ {'permissions': {'allow': aioperator_claude_allow}} | to_nice_json }}\n"
+    content: "{{ {'permissions': {'allow': aioperator_claude_allow}, 'hooks': aioperator_claude_hooks} | to_nice_json }}\n"
 
 # No restart handler on purpose: restarting claude-remote ends the operator's
 # own session. Unit changes take effect at the next restart by the owner or a

@@ -1,0 +1,58 @@
+#!/usr/bin/python3
+"""Claude Code PostToolUse hook (Bash, managed settings): show what a PR really contains.
+
+After `gh pr create` or a `git push`, fetch the PR's file list from GitHub
+and hand it to the agent, so it compares the shipped files with what it
+meant to ship (gitignored files never reach a PR). Silent for other commands.
+"""
+import json
+import re
+import shutil
+import subprocess
+import sys
+
+GH = shutil.which("gh") or "/usr/bin/gh"
+
+
+def run(*args, cwd=None):
+    r = subprocess.run(args, capture_output=True, text=True, cwd=cwd, timeout=30)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def main() -> int:
+    event = json.load(sys.stdin)
+    command = event.get("tool_input", {}).get("command", "")
+    if not re.search(r"\bgh\s+pr\s+create\b|\bgit\b[^|;&]*\bpush\b", command):
+        return 0
+    response = event.get("tool_response", {})
+    output = " ".join(str(response.get(k, "")) for k in ("stdout", "stderr")) if isinstance(response, dict) else str(response)
+
+    targets = re.findall(r"https://github\.com/[\w.-]+/[\w.-]+/pull/\d+", output)
+    if not targets:
+        # A push to a branch with an open PR: look the PR up from the pushed branch.
+        cwd = event.get("cwd")
+        branch = run("git", "branch", "--show-current", cwd=cwd)
+        if branch and branch != "main":
+            url = run(GH, "pr", "view", branch, "--json", "url", "-q", ".url", cwd=cwd)
+            if url:
+                targets = [url]
+    reports = []
+    for url in dict.fromkeys(targets):
+        files = run(GH, "pr", "diff", url, "--name-only")
+        state = run(GH, "pr", "view", url, "--json", "state", "-q", ".state")
+        if files or state:
+            reports.append(f"{url} ({state or 'unknown state'}) contains on GitHub:\n{files or '(no files)'}")
+    if not reports:
+        return 0
+    context = ("Verification (managed hook): compare these files with everything you meant to ship "
+               "(check .gitignore if one is missing) before you report the PR as done.\n" + "\n".join(reports))
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": context}}))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as e:  # a hook must never break the session
+        print(f"verify-pr hook error: {e}", file=sys.stderr)
+        sys.exit(0)

@@ -93,3 +93,19 @@ aioperator_github_permissions:
 # Used while the App is not configured.
 aioperator_git_fallback_name: Olivers AI
 aioperator_git_fallback_email: mrsimpson-ai@beimir.net
+
+# Claude Code hooks enforced through the managed settings (the operator can
+# neither change nor disable them). Scripts: files/agent-hooks/.
+aioperator_claude_hooks_dir: /usr/local/lib/homelab-agent-hooks
+aioperator_claude_hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: "{{ aioperator_claude_hooks_dir }}/stop-check"
+          timeout: 30
+  PostToolUse:
+    - matcher: Bash
+      hooks:
+        - type: command
+          command: "{{ aioperator_claude_hooks_dir }}/verify-pr"
+          timeout: 60

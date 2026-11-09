@@ -1,0 +1,52 @@
+---
+# Renders the Claude Code managed settings and hook scripts into a scratch
+# directory and checks the structure Claude Code expects.
+# Run: ansible-playbook tests/claude-managed-settings.yml -e out=$(mktemp -d)
+- name: Render Claude Code managed settings
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../roles/aioperator/defaults/main.yml
+  tasks:
+    # set_fact: vars_files would win over play vars.
+    - name: Point the hooks at the scratch directory
+      ansible.builtin.set_fact:
+        aioperator_claude_hooks_dir: "{{ out }}/hooks"
+
+    - name: Install the hook scripts
+      ansible.builtin.copy:
+        src: ../roles/aioperator/files/agent-hooks/
+        dest: "{{ out }}/hooks/"
+        mode: "0755"
+
+    - name: Render managed settings like the role does
+      ansible.builtin.copy:
+        dest: "{{ out }}/managed-settings.json"
+        mode: "0644"
+        content: "{{ {'permissions': {'allow': aioperator_claude_allow}, 'hooks': aioperator_claude_hooks} | to_nice_json }}\n"
+
+    - name: Read the result
+      ansible.builtin.slurp:
+        src: "{{ out }}/managed-settings.json"
+      register: settings_raw
+
+    - name: Check structure and that every hook command exists
+      vars:
+        settings: "{{ settings_raw.content | b64decode | from_json }}"
+        commands: "{{ settings.hooks.values() | flatten | map(attribute='hooks') | flatten | map(attribute='command') | list }}"
+      ansible.builtin.assert:
+        that:
+          - "'Bash(gh pr merge:*)' in settings.permissions.allow"
+          - settings.hooks.Stop[0].hooks[0].type == 'command'
+          - settings.hooks.PostToolUse[0].matcher == 'Bash'
+          - commands | length == 2
+          - commands | map('regex_search', '^' ~ out ~ '/hooks/') | select | list | length == 2
+
+    - name: Pipe-test the stop hook outside the workspace (must stay silent)
+      ansible.builtin.command:
+        cmd: "{{ out }}/hooks/stop-check"
+        stdin: '{"cwd": "/", "stop_hook_active": false}'
+      register: stop_out
+      changed_when: false
+      failed_when: stop_out.rc != 0 or stop_out.stdout != ''

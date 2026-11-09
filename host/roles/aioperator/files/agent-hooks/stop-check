@@ -1,0 +1,62 @@
+#!/usr/bin/python3
+"""Claude Code Stop hook (managed settings): keep the shared checkouts clean.
+
+Sessions must work in their own git worktrees. Before a session ends its
+turn, every shared checkout in the workspace has to be on main with no
+uncommitted changes; otherwise the stop is blocked and the agent is told
+what to fix. Worktrees with commits that are not pushed get a reminder.
+"""
+import json
+import os
+import subprocess
+import sys
+
+WORKSPACE = os.environ.get("HOMELAB_WORKSPACE", os.path.expanduser("~/projects/digitaleraluhut"))
+SHARED = ["homelab", "homelab-apps", "local-ai", "homelab-wiki"]
+
+
+def git(repo, *args):
+    return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True).stdout.strip()
+
+
+def main() -> int:
+    event = json.load(sys.stdin)
+    # Already blocked once in this stop sequence: never loop.
+    if event.get("stop_hook_active"):
+        return 0
+    if not os.path.realpath(event.get("cwd", "")).startswith(os.path.realpath(WORKSPACE)):
+        return 0
+
+    problems, notes = [], []
+    for name in SHARED:
+        repo = os.path.join(WORKSPACE, name)
+        if not os.path.isdir(os.path.join(repo, ".git")):
+            continue
+        branch = git(repo, "branch", "--show-current")
+        if branch != "main":
+            problems.append(f"{name}: shared checkout is on '{branch or 'detached HEAD'}', not main")
+        dirty = git(repo, "status", "--porcelain", "--untracked-files=no")
+        if dirty:
+            problems.append(f"{name}: uncommitted changes in the shared checkout:\n{dirty}")
+        for line in git(repo, "worktree", "list", "--porcelain").split("\n\n"):
+            fields = dict(l.split(" ", 1) for l in line.splitlines() if " " in l)
+            path, ref = fields.get("worktree"), fields.get("branch", "")
+            if not path or os.path.realpath(path) == os.path.realpath(repo) or not ref:
+                continue
+            unpushed = git(path, "log", "--oneline", "@{upstream}..HEAD") if git(path, "rev-parse", "--abbrev-ref", "@{upstream}") else "no upstream"
+            if unpushed:
+                notes.append(f"{name}: worktree {path} ({ref.removeprefix('refs/heads/')}) has unpushed work: {unpushed[:200]}")
+
+    if problems:
+        reason = ("Workspace rule (AGENTS.md): shared checkouts stay on a clean main; work happens in "
+                  "worktrees under .worktrees/. Fix this before you finish:\n- " + "\n- ".join(problems))
+        if notes:
+            reason += "\nAlso:\n- " + "\n- ".join(notes)
+        print(json.dumps({"decision": "block", "reason": reason}))
+    elif notes:
+        print(json.dumps({"systemMessage": "Unpushed worktree work:\n- " + "\n- ".join(notes)}))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
