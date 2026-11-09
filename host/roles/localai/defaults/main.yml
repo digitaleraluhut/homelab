@@ -54,8 +54,3 @@ localai_resident_models:
 # localai_home/models, verifies sha256, never deletes. Runs after a checkout
 # change and daily (resumes interrupted downloads).
 localai_model_sync_timer: daily
-
-# Units of the removed q38rocm fork lane (local-ai#19). The role stops and
-# removes them once; the files can be dropped from this list later.
-localai_removed_units:
-  - llama-q38@qwen3.8-dual.service
