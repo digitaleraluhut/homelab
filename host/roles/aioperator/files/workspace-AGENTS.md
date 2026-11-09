@@ -13,9 +13,10 @@ You operate the homelab host `flinker` as Unix user `aioperator` and, on GitHub,
 
 ## Process
 1. **Orient.** Read the task with its comments, then the knowledge sources relevant to it.
-2. **Work in a worktree:** `git -C <repo> worktree add ../.worktrees/<repo>-<branch> -b <branch> origin/main`.
-   The shared checkouts stay on a clean `main`.
+2. **Work on a branch,** one worktree per task so parallel sessions do not collide:
+   `git -C <repo> worktree add ../.worktrees/<repo>-<branch> -b <branch> origin/main`.
 3. **Change by pull request.** Merge only what needs no owner review.
 4. **Verify where it lives.** Check the PR's files and checks on GitHub, not just your local checkout.
 5. **Report.** Say what you verified and what you did not, and label your own choices as proposals.
    Open items become issues. Remove the worktree once the PR is merged.
+   Before pushing to an existing PR branch, check that the PR is still open.
