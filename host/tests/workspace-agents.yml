@@ -1,0 +1,33 @@
+---
+# Installs AGENTS.md and the CLAUDE.md link into a scratch workspace.
+# Run: ansible-playbook tests/workspace-agents.yml -e out=$(mktemp -d)
+- name: Install workspace instructions (scratch)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../roles/aioperator/defaults/main.yml
+  tasks:
+    # set_fact: vars_files would win over play vars.
+    - name: Point the workspace at the scratch directory
+      ansible.builtin.set_fact:
+        aioperator_user: "{{ lookup('env', 'USER') }}"
+        aioperator_workspace: "{{ out }}/ws"
+
+    # include_role keeps the role context, so files/ resolves as on the host.
+    - name: Run the role's tasks (twice, for idempotence)
+      ansible.builtin.include_role:
+        name: aioperator
+        tasks_from: workspace-agents
+      loop: [1, 2]
+
+    - name: Inspect the results
+      ansible.builtin.stat:
+        path: "{{ out }}/ws/CLAUDE.md"
+      register: claude_md
+
+    - name: CLAUDE.md links to AGENTS.md
+      ansible.builtin.assert:
+        that:
+          - claude_md.stat.islnk
+          - claude_md.stat.lnk_source == out ~ '/ws/AGENTS.md'
