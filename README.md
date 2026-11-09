@@ -193,6 +193,12 @@ The homelab is operated by an AI agent under the owner's review.
 2. The owner runs `scripts/apply-operator-handoff.sh`, which is reviewed and lives in this repo. For each entry it shows the diff and asks. It then commits onto an open PR branch, or onto a new branch with a new PR. It only writes `.github/workflows/*.yml` and never merges.
 3. The owner reviews and merges the PRs as usual.
 
+**Limits for the operator:**
+- New rights (sudo, cluster, GitHub) only as narrow entries in a PR to this repo. It never edits its own Claude Code settings.
+- It never restarts `claude-remote.service`, because that ends its own session.
+- No IPs, account IDs or e-mail addresses in public repositories.
+- Values it chooses (budgets, limits, schedules) are labeled as proposals.
+
 **Enforced, not just agreed:**
 - Rulesets: PR-only `main`, CODEOWNERS review.
 - Secrets only in the `production` environment, which is limited to `main`.
