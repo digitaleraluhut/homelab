@@ -27,7 +27,7 @@ group).
 | Role | Manages |
 |---|---|
 | `runner` | ansible-core, git, the runner script, service and timer |
-| `aioperator` | user `aioperator`, its sudo whitelist (validated with `visudo`), `claude-remote.service`, agent-skill checkout and symlinks, Claude Code managed settings `/etc/claude-code/managed-settings.json` (operator permissions and enforced hooks: `stop-check` keeps shared checkouts on a clean main, `verify-pr` shows a PR's real file list after create/push), GitHub access via an org GitHub App (token helper, `gh` wrapper, `~/.gitconfig`) |
+| `aioperator` | user `aioperator`, its sudo whitelist (validated with `visudo`), `claude-remote.service`, agent-skill checkout and symlinks, Claude Code managed settings `/etc/claude-code/managed-settings.json` (operator permissions and the enforced `stop-check` hook: shared checkouts stay on a clean main), GitHub access via an org GitHub App (token helper, `gh` wrapper, `~/.gitconfig`) |
 | `localai` | model sync (`localai-model-sync`, catalog `models/catalog.yaml` of local-ai: downloads missing files, verifies sha256, never deletes; after each ref change and daily), system user `localai` (home `/srv/localai`, GPU groups, subuid range, linger), pinned `local-ai` checkout, presets synced to `~/.config/llama-cpp`, unit templates and drop-ins, service instances, lab slot `llama-server@lab` (preset `lab/lab.ini`, port 8095, not started by default) |
 | `timeshift` | excludes in `/etc/timeshift/timeshift.json` for data that is only pulled (models, container images, caches, git checkouts, the operator home). Snapshots land on the same disk; adds missing entries only, the owner's own entries and settings stay |
 

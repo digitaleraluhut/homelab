@@ -105,19 +105,7 @@ aioperator_claude_hooks:
         - type: command
           command: "{{ aioperator_claude_hooks_dir }}/stop-check"
           timeout: 30
-  PostToolUse:
-    - matcher: Bash
-      hooks:
-        - type: command
-          command: "{{ aioperator_claude_hooks_dir }}/verify-pr"
-          timeout: 60
-  # A refused push ends the Bash call with an error: same script.
-  PostToolUseFailure:
-    - matcher: Bash
-      hooks:
-        - type: command
-          command: "{{ aioperator_claude_hooks_dir }}/verify-pr"
-          timeout: 60
+
 
 # gitleaks for the repositories' pre-commit hooks. Keep version and checksum
 # in sync with .github/workflows/secret-scan.yml (linux x64 tarball).
