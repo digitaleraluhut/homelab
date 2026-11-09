@@ -124,6 +124,9 @@
     enabled: true
     state: started
 
+- name: Install gitleaks and activate the repositories' hooks
+  ansible.builtin.include_tasks: git-hooks.yml
+
 - name: Check out the skills-coding repository
   become: true
   become_user: "{{ aioperator_user }}"

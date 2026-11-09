@@ -93,3 +93,24 @@ aioperator_github_permissions:
 # Used while the App is not configured.
 aioperator_git_fallback_name: Olivers AI
 aioperator_git_fallback_email: mrsimpson-ai@beimir.net
+
+# gitleaks for the repositories' pre-commit hooks. Keep version and checksum
+# in sync with .github/workflows/secret-scan.yml (linux x64 tarball).
+aioperator_gitleaks_version: 8.30.1
+aioperator_gitleaks_sha256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+aioperator_gitleaks_dir: /usr/local/lib/gitleaks/{{ aioperator_gitleaks_version }}
+aioperator_gitleaks_link: /usr/local/bin/gitleaks
+aioperator_gitleaks_owner: root
+aioperator_gitleaks_url: >-
+  https://github.com/gitleaks/gitleaks/releases/download/v{{ aioperator_gitleaks_version
+  }}/gitleaks_{{ aioperator_gitleaks_version }}_linux_x64.tar.gz
+aioperator_gitleaks_headers: {}
+
+# Activate each repository's own hooks in the operator's checkouts (worktrees
+# share the setting). githooks: core.hooksPath=.githooks; husky: run husky,
+# which sets core.hooksPath=.husky/_ (needs node_modules).
+aioperator_workspace: "{{ aioperator_home }}/projects/digitaleraluhut"
+aioperator_repo_hooks:
+  homelab: husky
+  homelab-apps: githooks
+  local-ai: githooks
