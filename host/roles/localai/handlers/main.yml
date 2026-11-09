@@ -10,3 +10,10 @@
     daemon_reload: true
     state: restarted
   loop: "{{ localai_instances }}"
+
+- name: Run model sync
+  ansible.builtin.systemd_service:
+    name: localai-model-sync.service
+    state: started
+    daemon_reload: true
+    no_block: true
