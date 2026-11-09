@@ -157,6 +157,30 @@
       Environment=LLAMA_CONFIG_DIR={{ localai_lab_dir }}
       Environment=LLAMA_SERVER_PORT={{ localai_lab_port }}
 
+- name: Create the router drop-in directory
+  ansible.builtin.file:
+    path: "{{ localai_home }}/.config/systemd/user/{{ localai_router_instance }}.d"
+    state: directory
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0755"
+
+# The router only loads presets with load-on-startup = true by itself.
+# Every other model (e.g. qwen3.8-27b) stays unloaded until it is
+# requested explicitly (POST /models/load or ?autoload=true). The flag is
+# global per router instance, there is no per-model setting.
+- name: Disable on-demand model autoload on the router
+  ansible.builtin.copy:
+    dest: "{{ localai_home }}/.config/systemd/user/{{ localai_router_instance }}.d/no-autoload.conf"
+    owner: "{{ localai_user }}"
+    group: "{{ localai_user }}"
+    mode: "0644"
+    content: |
+      # Managed by Ansible (digitaleraluhut/homelab host/), do not edit.
+      [Service]
+      Environment=LLAMA_NO_AUTOLOAD=1
+  notify: Restart local-ai services
+
 - name: Install the model sync unit
   ansible.builtin.copy:
     dest: /etc/systemd/system/localai-model-sync.service

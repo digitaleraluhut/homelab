@@ -38,6 +38,10 @@ localai_instances:
 # operator can swap it without a PR; start/stop/restart is whitelisted.
 localai_lab_dir: "{{ localai_home }}/lab"
 localai_lab_instance: llama-server@lab.service
+
+# The model router (port 8080). It loads only presets with
+# load-on-startup = true; other models need an explicit load request.
+localai_router_instance: llama-server@router.service
 localai_lab_port: 8095
 
 # Model sync: downloads missing entries of models/catalog.yaml (local-ai) into
