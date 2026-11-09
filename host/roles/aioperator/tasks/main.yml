@@ -157,3 +157,6 @@
   loop: "{{ aioperator_skill_dirs | product(aioperator_skills | dict2items) | list }}"
   loop_control:
     label: "{{ item.0 }}/{{ item.1.key }}"
+
+- name: Install the repository's skills
+  ansible.builtin.include_tasks: repo-skills.yml

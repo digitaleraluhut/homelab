@@ -1,0 +1,33 @@
+---
+# Copy this repository's skills into every harness's skill directory.
+# Earlier versions symlinked some of them into working checkouts; replace
+# such links first, or the copy would write through them into the checkout.
+
+- name: Check for old skill symlinks
+  ansible.builtin.stat:
+    path: "{{ item.0 }}/{{ item.1 }}"
+  loop: "{{ aioperator_skill_dirs | product(aioperator_repo_skills) | list }}"
+  loop_control:
+    label: "{{ item.0 }}/{{ item.1 }}"
+  register: aioperator_repo_skill_stat
+
+- name: Remove old skill symlinks
+  ansible.builtin.file:
+    path: "{{ item.stat.path }}"
+    state: absent
+  loop: "{{ aioperator_repo_skill_stat.results }}"
+  loop_control:
+    label: "{{ item.item.0 }}/{{ item.item.1 }}"
+  when: item.stat.islnk | default(false)
+
+- name: Copy the repository's skills
+  ansible.builtin.copy:
+    src: "{{ aioperator_repo_skills_src }}/{{ item.1 }}/"
+    dest: "{{ item.0 }}/{{ item.1 }}/"
+    owner: "{{ aioperator_user }}"
+    group: "{{ aioperator_user }}"
+    mode: "0644"
+    directory_mode: "0755"
+  loop: "{{ aioperator_skill_dirs | product(aioperator_repo_skills) | list }}"
+  loop_control:
+    label: "{{ item.0 }}/{{ item.1 }}"

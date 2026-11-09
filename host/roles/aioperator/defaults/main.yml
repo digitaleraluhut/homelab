@@ -59,10 +59,10 @@ aioperator_skills:
   tdd-with-agents: "{{ aioperator_skills_coding_dir }}/tdd-with-agents"
   claude-code-sessions: "{{ aioperator_skills_coding_dir }}/claude-code-sessions"
   commit-intents: "{{ aioperator_skills_coding_dir }}/commit-intents"
-  # Working checkout of the private wiki repo; maintained by the operator, not here.
-  wiki-maintenance: "{{ aioperator_home }}/projects/digitaleraluhut/homelab-wiki/skills/wiki-maintenance"
-  # From the shared homelab checkout, which hooks keep on a clean main.
-  workflow-handoff: "{{ aioperator_home }}/projects/digitaleraluhut/homelab/skills/workflow-handoff"
+# Skills from this repository (skills/<name>), copied from the reviewed main
+# that the runner applies. They do not depend on the operator's checkouts.
+aioperator_repo_skills: [wiki-maintenance, workflow-handoff]
+aioperator_repo_skills_src: "{{ playbook_dir }}/../skills"
 aioperator_skill_dirs:
   - "{{ aioperator_home }}/.agents/skills"
   - "{{ aioperator_home }}/.claude/skills"

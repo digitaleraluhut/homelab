@@ -1,0 +1,52 @@
+---
+# Copies the repository's skills into scratch skill directories, including the
+# migration from an old symlink (which must not be written through).
+# Run: ansible-playbook tests/repo-skills.yml -e out=$(mktemp -d)
+- name: Install repository skills (scratch)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../roles/aioperator/defaults/main.yml
+  tasks:
+    # set_fact: vars_files would win over play vars.
+    - name: Point everything at the scratch directory
+      ansible.builtin.set_fact:
+        aioperator_user: "{{ lookup('env', 'USER') }}"
+        aioperator_skill_dirs: ["{{ out }}/agents", "{{ out }}/claude"]
+        aioperator_repo_skills_src: "{{ playbook_dir }}/../../skills"
+
+    - name: Create the skill directories and a fake old checkout
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop: ["{{ out }}/agents", "{{ out }}/claude", "{{ out }}/old-checkout/wiki-maintenance"]
+
+    - name: Simulate the old symlink into a working checkout
+      ansible.builtin.file:
+        src: "{{ out }}/old-checkout/wiki-maintenance"
+        dest: "{{ out }}/agents/wiki-maintenance"
+        state: link
+
+    - name: Run the role's tasks (twice, for idempotence)
+      ansible.builtin.include_tasks: ../roles/aioperator/tasks/repo-skills.yml
+      loop: [1, 2]
+
+    - name: Inspect the results
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ out }}/agents/wiki-maintenance"
+        - "{{ out }}/agents/workflow-handoff/SKILL.md"
+        - "{{ out }}/claude/wiki-maintenance/SKILL.md"
+        - "{{ out }}/old-checkout/wiki-maintenance/SKILL.md"
+      register: results
+
+    - name: Skills are real copies; the old checkout was not written to
+      ansible.builtin.assert:
+        that:
+          - results.results[0].stat.isdir and not results.results[0].stat.islnk
+          - results.results[1].stat.exists
+          - results.results[2].stat.exists
+          - not results.results[3].stat.exists
