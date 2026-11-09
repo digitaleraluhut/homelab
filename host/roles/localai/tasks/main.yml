@@ -127,6 +127,36 @@
   loop: "{{ localai_unit_dropins }}"
   notify: Restart local-ai services
 
+- name: Look for units of the removed fork lane
+  ansible.builtin.stat:
+    path: "{{ localai_home }}/.config/systemd/user/{{ item }}"
+  loop: "{{ localai_removed_units }}"
+  register: localai_removed_unit_files
+
+- name: Stop and disable the removed units
+  become: true
+  become_user: "{{ localai_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ localai_account.uid }}"
+  ansible.builtin.systemd_service:
+    name: "{{ item.item }}"
+    scope: user
+    state: stopped
+    enabled: false
+  loop: "{{ localai_removed_unit_files.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.stat.exists
+
+- name: Remove the unit files of the removed fork lane
+  ansible.builtin.file:
+    path: "{{ localai_home }}/.config/systemd/user/{{ item }}"
+    state: absent
+  loop:
+    - llama-q38@.service
+    - llama-q38@.service.d
+    - llama-server@fork-router.service.d
+
 - name: Create the lab preset directory (group-writable)
   ansible.builtin.file:
     path: "{{ localai_lab_dir }}"

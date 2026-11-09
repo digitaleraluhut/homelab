@@ -10,7 +10,7 @@ localai_subid_count: 65536
 
 localai_repo: https://github.com/digitaleraluhut/local-ai.git
 # Pinned: a merge in local-ai reaches the host only after this is bumped here.
-localai_ref: 769286104b6654bd3d9fb869e52d9a82952d9396
+localai_ref: 0095412d18f3d9e27e98cd1ced1b0327cfddc68d
 localai_checkout: "{{ localai_home }}/local-ai"
 
 # Data the wrappers expect under $HOME (moved there once by hand).
@@ -19,17 +19,14 @@ localai_data_dirs: [models, ComfyUI, opt, images]
 # Unit templates and drop-ins copied from the checkout's systemd/ directory.
 localai_unit_files:
   - llama-server@.service
-  - llama-q38@.service
   - whisper-server@.service
   - comfyui-server@.service
-localai_unit_dropins:
-  - llama-q38@.service.d
+localai_unit_dropins: []
 
-# Instances that should run. Ports: router 8080, qwen3.8-dual 8090,
+# Instances that should run. Ports: router 8080,
 # whisper 8081, comfyui 8082 (bridge) / 8188.
 localai_instances:
   - llama-server@router.service
-  - llama-q38@qwen3.8-dual.service
   - whisper-server@whisper.service
   - comfyui-server@comfyui.service
   - llama-router-resident.service
@@ -57,3 +54,8 @@ localai_resident_models:
 # localai_home/models, verifies sha256, never deletes. Runs after a checkout
 # change and daily (resumes interrupted downloads).
 localai_model_sync_timer: daily
+
+# Units of the removed q38rocm fork lane (local-ai#19). The role stops and
+# removes them once; the files can be dropped from this list later.
+localai_removed_units:
+  - llama-q38@qwen3.8-dual.service
