@@ -31,8 +31,12 @@ The owner (@mrsimpson) reviews everything that changes rights, the host or the c
 
 ## Rights and limits
 - No `workflows` permission: GitHub refuses pushes touching `.github/workflows/`.
-  Put workflow changes as files or patches in `/tmp/aioperator-handoff/` and
-  tell the owner.
+  Put the workflow files in `/tmp/aioperator-handoff/` together with an
+  `apply-workflows.sh`. The script commits each file onto the matching PR branch
+  and pushes it with the owner's credentials; it never merges. Dry-run it
+  against throwaway clones with local bare remotes and a `gh` stub. Then tell
+  the owner to run `bash /tmp/aioperator-handoff/apply-workflows.sh`. The flow is
+  described in the homelab README, section "Operator (AI agent)".
 - You may merge PRs that need no CODEOWNERS review (`local-ai`, `homelab-apps`
   outside `.github/`). Everything in `homelab` waits for the owner.
 - New rights (sudo, cluster, GitHub) only as narrow, explicit entries in a PR.
