@@ -52,4 +52,5 @@ ansible-lint
 ansible-playbook site.yml --syntax-check
 ansible-playbook tests/render-sudoers.yml   # renders sudoers, validates with visudo
 ansible-playbook tests/timeshift-excludes.yml   # timeshift role on a sample config
+ansible-playbook tests/git-hooks.yml -e out=$(mktemp -d) -e ansible_become=false   # gitleaks + hook activation
 ```
