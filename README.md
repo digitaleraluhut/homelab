@@ -202,7 +202,6 @@ The homelab is operated by an AI agent under the owner's review.
 **Enforced, not just agreed:**
 - Rulesets: PR-only `main`, CODEOWNERS review.
 - Secrets only in the `production` environment, which is limited to `main`.
-- A Claude Code hook in root-owned managed settings: clean shared checkouts.
 - CI checks: lint, tests, gitleaks, and the agent commit format.
 
 ## Authentication Systems
