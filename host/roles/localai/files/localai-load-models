@@ -1,0 +1,28 @@
+#!/bin/bash
+# Load the resident models into a running llama.cpp router (port $1).
+# Usage: localai-load-models <port> <model>...
+# The router runs with --no-models-autoload, so this list (role variable
+# localai_resident_models) decides what is in GPU memory after a start.
+set -u
+port=$1; shift
+base="http://127.0.0.1:${port}"
+
+for _ in $(seq 1 120); do
+    curl -s -o /dev/null -m 5 "$base/health" && break
+    sleep 5
+done
+
+rc=0
+for model in "$@"; do
+    body=$(printf '{"model":"%s"}' "$model")
+    code=$(curl -s -o /tmp/localai-load.$$ -w '%{http_code}' -m 900 -X POST \
+        -H 'Content-Type: application/json' -d "$body" "$base/models/load")
+    if [[ "$code" == 200 ]] || grep -q 'already running' /tmp/localai-load.$$ 2>/dev/null; then
+        echo "resident: $model ok"
+    else
+        echo "resident: $model FAILED (HTTP $code): $(cat /tmp/localai-load.$$)" >&2
+        rc=1
+    fi
+done
+rm -f /tmp/localai-load.$$
+exit $rc

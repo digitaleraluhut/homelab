@@ -32,17 +32,26 @@ localai_instances:
   - llama-q38@qwen3.8-dual.service
   - whisper-server@whisper.service
   - comfyui-server@comfyui.service
+  - llama-router-resident.service
 
 # Lab slot for model experiments: not started by default (GPU memory is
 # shared). Its preset is lab/lab.ini, writable by group localai, so the
 # operator can swap it without a PR; start/stop/restart is whitelisted.
 localai_lab_dir: "{{ localai_home }}/lab"
 localai_lab_instance: llama-server@lab.service
-
-# The model router (port 8080). It loads only presets with
-# load-on-startup = true; other models need an explicit load request.
-localai_router_instance: llama-server@router.service
 localai_lab_port: 8095
+
+# The model router. Autoload is off: the models listed in
+# localai_resident_models are loaded after every router start, all others
+# only on an explicit request (POST /models/load). Names are the preset
+# section names in the local-ai configs. Several entries are fine; mind the
+# shared unified memory (about 109 GiB for everything on the host).
+localai_router_instance: llama-server@router.service
+localai_router_port: 8080
+localai_resident_unit: llama-router-resident.service
+localai_resident_models:
+  - qwen3.6-35b-a3b
+  - bge-m3
 
 # Model sync: downloads missing entries of models/catalog.yaml (local-ai) into
 # localai_home/models, verifies sha256, never deletes. Runs after a checkout
