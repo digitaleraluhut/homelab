@@ -130,6 +130,7 @@ Or extend `packages/core/infrastructure/` for reusable modules.
 - **[OAuth2-Proxy Examples](./docs/OAUTH2_PROXY_EXAMPLES.md)** - Step-by-step usage examples
 - **[ADRs](./docs/adr/)** - Architecture decisions
 - **[How-To Guides](./docs/howto/)** - Setup, deployment, operations
+- **[Operator (AI agent)](#operator-ai-agent-who-may-change-what)** - who may change what, how changes reach the systems
 - **[Host configuration](./docs/howto/manage-host-config.md)** - Ansible for the node itself ([ADR-018](./docs/adr/018-host-configuration-ansible-pull.md))
 - **[Security Review](./docs/CRITICAL-REVIEW.md)** - Security assessment
 
@@ -167,6 +168,36 @@ cp /path/to/your/backup/pulumi-homelab.age ~/.config/sops/age/keys.txt
 pulumi config set --secret oauth2-proxy:usersEmails '["you@example.com"]' --stack dev
 pulumi config set --secret oauth2-proxy:developersEmails '["you@example.com"]' --stack dev
 ```
+
+## Operator (AI agent): who may change what
+
+The homelab is operated by an AI agent under the owner's review.
+
+| | Owner | Operator |
+|---|---|---|
+| Identity | `@mrsimpson` | Unix user `aioperator` on the host; on GitHub the org App `digitaleraluhut-operator[bot]` |
+| `homelab` (cluster base, host, rights) | reviews and merges | opens PRs only |
+| `homelab-apps`, `local-ai` outside `.github/` | – | opens and merges PRs |
+| `.github/` (workflows, CODEOWNERS, `apps.yaml`) | reviews and merges | PRs only; **cannot push workflow files** (see below) |
+| Cluster | admin | read-only (`operator-access`); deploys only through CI |
+| Host | sudo | narrow sudo whitelist from `host/` (Ansible) |
+
+**Changes reach the systems like this:**
+- **Apps:** PR to `homelab-apps` → merge → the deploy workflow on `main` deploys, with rights limited to the app's namespace.
+- **Cluster base:** PR to `homelab` → owner review → `deploy-homelab-infra`.
+- **Host** (`host/`): PR to `homelab` → owner review → the host pulls `main` every 10 minutes ([manage-host-config](./docs/howto/manage-host-config.md)).
+- **local-ai:** PR to `local-ai` → merge → takes effect only after the pin `localai_ref` in `homelab` is bumped (owner review).
+
+**Workflow changes.** The App has no `workflows` permission. That is deliberate: otherwise a pushed branch could carry its own workflow and run it with self-chosen `GITHUB_TOKEN` rights, without any review. Instead:
+1. The operator puts the workflow files and an `apply-workflows.sh` into `/tmp/aioperator-handoff/` on the host.
+2. The owner runs `bash /tmp/aioperator-handoff/apply-workflows.sh`. The script commits the files onto the matching PR branches and pushes them with the owner's credentials. It merges nothing.
+3. The owner reviews and merges the PRs as usual.
+
+**Enforced, not just agreed:**
+- Rulesets: PR-only `main`, CODEOWNERS review.
+- Secrets only in the `production` environment, which is limited to `main`.
+- Claude Code hooks in root-owned managed settings: clean shared checkouts, PR contents verified after each push.
+- CI checks: lint, tests, gitleaks, and the agent commit format.
 
 ## Authentication Systems
 
