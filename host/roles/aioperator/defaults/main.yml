@@ -109,3 +109,10 @@ aioperator_claude_hooks:
         - type: command
           command: "{{ aioperator_claude_hooks_dir }}/verify-pr"
           timeout: 60
+  # A refused push ends the Bash call with an error: same script.
+  PostToolUseFailure:
+    - matcher: Bash
+      hooks:
+        - type: command
+          command: "{{ aioperator_claude_hooks_dir }}/verify-pr"
+          timeout: 60

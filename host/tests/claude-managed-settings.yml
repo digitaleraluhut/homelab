@@ -40,8 +40,9 @@
           - "'Bash(gh pr merge:*)' in settings.permissions.allow"
           - settings.hooks.Stop[0].hooks[0].type == 'command'
           - settings.hooks.PostToolUse[0].matcher == 'Bash'
-          - commands | length == 2
-          - commands | map('regex_search', '^' ~ out ~ '/hooks/') | select | list | length == 2
+          - settings.hooks.PostToolUseFailure[0].matcher == 'Bash'
+          - commands | length == 3
+          - commands | map('regex_search', '^' ~ out ~ '/hooks/') | select | list | length == 3
 
     - name: Pipe-test the stop hook outside the workspace (must stay silent)
       ansible.builtin.command:

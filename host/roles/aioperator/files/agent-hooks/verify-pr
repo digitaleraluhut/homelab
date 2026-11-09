@@ -1,9 +1,12 @@
 #!/usr/bin/python3
-"""Claude Code PostToolUse hook (Bash, managed settings): show what a PR really contains.
+"""Claude Code hook (Bash, PostToolUse and PostToolUseFailure, managed settings).
 
-After `gh pr create` or a `git push`, fetch the PR's file list from GitHub
-and hand it to the agent, so it compares the shipped files with what it
-meant to ship (gitignored files never reach a PR). Silent for other commands.
+- After `gh pr create` or a `git push`, fetch the PR's file list from GitHub
+  and hand it to the agent, so it compares the shipped files with what it
+  meant to ship (gitignored files never reach a PR).
+- If GitHub refused a push because the App lacks the `workflows` permission,
+  tell the agent how to hand the workflow change to the owner.
+Silent for other commands.
 """
 import json
 import re
@@ -19,8 +22,27 @@ def run(*args, cwd=None):
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
+HANDOFF = (
+    "GitHub refused the push because it touches .github/workflows/ and the operator's App has no "
+    "`workflows` permission (deliberate). Do not retry and do not ask for that permission. Instead: "
+    "remove the workflow change from your branch and push the rest; put the workflow file(s) into "
+    "/tmp/aioperator-handoff/<repo>/ and add a line per file to /tmp/aioperator-handoff/handoff.tsv "
+    "(tab-separated: repo, existing PR branch or new:<branch>, file path relative to the handoff dir, "
+    "commit message); then mention the pending handoff in the PR description and tell the owner to run "
+    "homelab/scripts/apply-operator-handoff.sh. See AGENTS.md rule 6."
+)
+
+
+def context(event, text):
+    name = event.get("hook_event_name", "PostToolUse")
+    return json.dumps({"hookSpecificOutput": {"hookEventName": name, "additionalContext": text}})
+
+
 def main() -> int:
     event = json.load(sys.stdin)
+    if re.search(r"without [`']?workflows[`']? permission", json.dumps(event)):
+        print(context(event, HANDOFF))
+        return 0
     command = event.get("tool_input", {}).get("command", "")
     if not re.search(r"\bgh\s+pr\s+create\b|\bgit\b[^|;&]*\bpush\b", command):
         return 0
@@ -44,9 +66,9 @@ def main() -> int:
             reports.append(f"{url} ({state or 'unknown state'}) contains on GitHub:\n{files or '(no files)'}")
     if not reports:
         return 0
-    context = ("Verification (managed hook): compare these files with everything you meant to ship "
+    text = ("Verification (managed hook): compare these files with everything you meant to ship "
                "(check .gitignore if one is missing) before you report the PR as done.\n" + "\n".join(reports))
-    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": context}}))
+    print(context(event, text))
     return 0
 
 
