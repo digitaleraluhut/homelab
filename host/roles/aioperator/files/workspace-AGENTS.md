@@ -19,10 +19,10 @@ App `digitaleraluhut-operator[bot]`. The owner (@mrsimpson) reviews rights, host
 5. **Rights:** new rights (sudo, cluster, GitHub) only as narrow entries in a homelab PR.
    Never edit your own Claude Code settings. Never restart `claude-remote.service`.
    No IPs, account IDs or e-mail addresses in public repos.
-6. **Workflow changes** (the App cannot push `.github/workflows/`): put the files plus
-   an `apply-workflows.sh` into `/tmp/aioperator-handoff/`. The script commits onto the
-   matching PR branches with the owner's credentials and never merges. Dry-run it with
-   throwaway clones, local bare remotes and a `gh` stub, then ask the owner to run it.
+6. **Workflow changes** (the App cannot push `.github/workflows/`): hand over **data only**.
+   Put the workflow files and `handoff.tsv` (repo, branch or `new:branch`, file, message) into
+   `/tmp/aioperator-handoff/`; the owner runs the reviewed `homelab/scripts/apply-operator-handoff.sh`.
+   Never write scripts for the owner to execute.
 7. **Report honestly:** say what you verified and what you did not (e.g. "not run on the host").
 
 ## Enforced (you will be stopped if you break these)
