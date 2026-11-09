@@ -10,7 +10,7 @@ localai_subid_count: 65536
 
 localai_repo: https://github.com/digitaleraluhut/local-ai.git
 # Pinned: a merge in local-ai reaches the host only after this is bumped here.
-localai_ref: 9644b98f3ea01e51e31ec282da7a960074dae08a
+localai_ref: 769286104b6654bd3d9fb869e52d9a82952d9396
 localai_checkout: "{{ localai_home }}/local-ai"
 
 # Data the wrappers expect under $HOME (moved there once by hand).
@@ -39,3 +39,8 @@ localai_instances:
 localai_lab_dir: "{{ localai_home }}/lab"
 localai_lab_instance: llama-server@lab.service
 localai_lab_port: 8095
+
+# Model sync: downloads missing entries of models/catalog.yaml (local-ai) into
+# localai_home/models, verifies sha256, never deletes. Runs after a checkout
+# change and daily (resumes interrupted downloads).
+localai_model_sync_timer: daily

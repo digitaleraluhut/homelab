@@ -61,6 +61,8 @@ aioperator_skills:
   commit-intents: "{{ aioperator_skills_coding_dir }}/commit-intents"
   # Working checkout of the private wiki repo; maintained by the operator, not here.
   wiki-maintenance: "{{ aioperator_home }}/projects/digitaleraluhut/homelab-wiki/skills/wiki-maintenance"
+  # From the shared homelab checkout, which hooks keep on a clean main.
+  workflow-handoff: "{{ aioperator_home }}/projects/digitaleraluhut/homelab/skills/workflow-handoff"
 aioperator_skill_dirs:
   - "{{ aioperator_home }}/.agents/skills"
   - "{{ aioperator_home }}/.claude/skills"
@@ -116,3 +118,24 @@ aioperator_claude_hooks:
         - type: command
           command: "{{ aioperator_claude_hooks_dir }}/verify-pr"
           timeout: 60
+
+# gitleaks for the repositories' pre-commit hooks. Keep version and checksum
+# in sync with .github/workflows/secret-scan.yml (linux x64 tarball).
+aioperator_gitleaks_version: 8.30.1
+aioperator_gitleaks_sha256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+aioperator_gitleaks_dir: /usr/local/lib/gitleaks/{{ aioperator_gitleaks_version }}
+aioperator_gitleaks_link: /usr/local/bin/gitleaks
+aioperator_gitleaks_owner: root
+aioperator_gitleaks_url: >-
+  https://github.com/gitleaks/gitleaks/releases/download/v{{ aioperator_gitleaks_version
+  }}/gitleaks_{{ aioperator_gitleaks_version }}_linux_x64.tar.gz
+aioperator_gitleaks_headers: {}
+
+# Activate each repository's own hooks in the operator's checkouts (worktrees
+# share the setting). githooks: core.hooksPath=.githooks; husky: run husky,
+# which sets core.hooksPath=.husky/_ (needs node_modules).
+aioperator_workspace: "{{ aioperator_home }}/projects/digitaleraluhut"
+aioperator_repo_hooks:
+  homelab: husky
+  homelab-apps: githooks
+  local-ai: githooks

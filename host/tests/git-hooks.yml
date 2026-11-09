@@ -1,0 +1,49 @@
+---
+# Runs the git-hooks tasks against a scratch directory: downloads and
+# verifies gitleaks, and activates hooks in throwaway clones.
+# Run: ansible-playbook tests/git-hooks.yml -e out=$(mktemp -d)
+- name: Install gitleaks and activate repository hooks (scratch)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../roles/aioperator/defaults/main.yml
+  tasks:
+    # set_fact: vars_files would win over play vars.
+    - name: Point everything at the scratch directory
+      ansible.builtin.set_fact:
+        aioperator_user: "{{ lookup('env', 'USER') }}"
+        aioperator_gitleaks_dir: "{{ out }}/gitleaks"
+        aioperator_gitleaks_link: "{{ out }}/bin/gitleaks"
+        aioperator_gitleaks_owner: "{{ lookup('env', 'USER') }}"
+        aioperator_workspace: "{{ out }}/ws"
+        aioperator_repo_hooks: {githooks-repo: githooks, missing-repo: githooks}
+
+    - name: Create scratch directories and a repository  # noqa: command-instead-of-module
+      ansible.builtin.command:
+        cmd: "git init -q {{ out }}/ws/githooks-repo"
+        creates: "{{ out }}/ws/githooks-repo/.git"
+
+    - name: Create the link directory
+      ansible.builtin.file:
+        path: "{{ out }}/bin"
+        state: directory
+        mode: "0755"
+
+    - name: Run the role's tasks (twice, for idempotence)
+      ansible.builtin.include_tasks: ../roles/aioperator/tasks/git-hooks.yml
+      loop: [1, 2]
+
+    - name: Check the result  # noqa: command-instead-of-module
+      ansible.builtin.command:
+        cmd: "git -C {{ out }}/ws/githooks-repo config --get core.hooksPath"
+      register: hooks_path
+      changed_when: false
+      failed_when: hooks_path.stdout != '.githooks'
+
+    - name: Check gitleaks runs
+      ansible.builtin.command:
+        cmd: "{{ out }}/bin/gitleaks version"
+      register: gl
+      changed_when: false
+      failed_when: aioperator_gitleaks_version not in gl.stdout

@@ -28,7 +28,7 @@ group).
 |---|---|
 | `runner` | ansible-core, git, the runner script, service and timer |
 | `aioperator` | user `aioperator`, its sudo whitelist (validated with `visudo`), `claude-remote.service`, agent-skill checkout and symlinks, Claude Code managed settings `/etc/claude-code/managed-settings.json` (operator permissions and enforced hooks: `stop-check` keeps shared checkouts on a clean main, `verify-pr` shows a PR's real file list after create/push), GitHub access via an org GitHub App (token helper, `gh` wrapper, `~/.gitconfig`) |
-| `localai` | system user `localai` (home `/srv/localai`, GPU groups, subuid range, linger), pinned `local-ai` checkout, presets synced to `~/.config/llama-cpp`, unit templates and drop-ins, service instances, lab slot `llama-server@lab` (preset `lab/lab.ini`, port 8095, not started by default) |
+| `localai` | model sync (`localai-model-sync`, catalog `models/catalog.yaml` of local-ai: downloads missing files, verifies sha256, never deletes; after each ref change and daily), system user `localai` (home `/srv/localai`, GPU groups, subuid range, linger), pinned `local-ai` checkout, presets synced to `~/.config/llama-cpp`, unit templates and drop-ins, service instances, lab slot `llama-server@lab` (preset `lab/lab.ini`, port 8095, not started by default) |
 | `timeshift` | excludes in `/etc/timeshift/timeshift.json` for data that is only pulled (models, container images, caches, git checkouts, the operator home). Snapshots land on the same disk; adds missing entries only, the owner's own entries and settings stay |
 
 `claude-remote.service` is never restarted by Ansible (that would end the
@@ -53,4 +53,5 @@ ansible-playbook site.yml --syntax-check
 ansible-playbook tests/render-sudoers.yml   # renders sudoers, validates with visudo
 ansible-playbook tests/timeshift-excludes.yml   # timeshift role on a sample config
 ansible-playbook tests/claude-managed-settings.yml -e out=$(mktemp -d)   # managed settings, hooks
+ansible-playbook tests/git-hooks.yml -e out=$(mktemp -d) -e ansible_become=false   # gitleaks + hook activation
 ```
