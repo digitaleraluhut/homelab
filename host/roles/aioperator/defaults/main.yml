@@ -61,6 +61,8 @@ aioperator_skills:
   commit-intents: "{{ aioperator_skills_coding_dir }}/commit-intents"
   # Working checkout of the private wiki repo; maintained by the operator, not here.
   wiki-maintenance: "{{ aioperator_home }}/projects/digitaleraluhut/homelab-wiki/skills/wiki-maintenance"
+  # From the shared homelab checkout, which hooks keep on a clean main.
+  workflow-handoff: "{{ aioperator_home }}/projects/digitaleraluhut/homelab/skills/workflow-handoff"
 aioperator_skill_dirs:
   - "{{ aioperator_home }}/.agents/skills"
   - "{{ aioperator_home }}/.claude/skills"
