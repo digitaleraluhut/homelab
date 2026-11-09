@@ -1,0 +1,28 @@
+---
+# The operator's workspace instructions (process and knowledge sources).
+# AGENTS.md is read by most agent harnesses; Claude Code reads CLAUDE.md.
+
+- name: Create the workspace directory
+  ansible.builtin.file:
+    path: "{{ aioperator_workspace }}"
+    state: directory
+    owner: "{{ aioperator_user }}"
+    group: "{{ aioperator_user }}"
+    mode: "0755"
+
+- name: Install AGENTS.md
+  ansible.builtin.copy:
+    src: workspace-AGENTS.md
+    dest: "{{ aioperator_workspace }}/AGENTS.md"
+    owner: "{{ aioperator_user }}"
+    group: "{{ aioperator_user }}"
+    mode: "0644"
+
+- name: Point CLAUDE.md at AGENTS.md
+  ansible.builtin.file:
+    src: AGENTS.md
+    dest: "{{ aioperator_workspace }}/CLAUDE.md"
+    state: link
+    force: true
+    owner: "{{ aioperator_user }}"
+    group: "{{ aioperator_user }}"
