@@ -58,20 +58,10 @@ import { releases as oauth2ProxyReleases } from "@mrsimpson/homelab-core-infrast
 export const oauth2ProxyInstances = oauth2ProxyReleases;
 
 // CI access for digitaleraluhut/homelab-apps: least-privilege ServiceAccount + kubeconfig.
-// To add an app: append its namespace to appNamespaces. If the namespace does not exist
-// yet, leave it out of existingNamespaces: it is then created here, and the app must not
-// create it itself.
+// Apps create their own namespaces, fenced by admission policies (see ci-access).
 import { createCiAccess } from "@mrsimpson/homelab-core-infrastructure";
 
-// lobehub and matrix are deliberately disabled (namespaces removed). To re-enable one,
-// add it here but NOT to existingNamespaces, and drop the app's own Namespace resource.
-// Namespaces created by the app stacks themselves.
-const existingNamespaces = ["aftertouch", "code", "librechat"];
-// "wiki" is NOT in existingNamespaces on purpose: it is created here and apps/wiki only references it.
-const appNamespaces = [...existingNamespaces, "wiki", "opencode"];
 const ciAccess = createCiAccess({
-  appNamespaces,
-  existingNamespaces,
   apiServer: new pulumi.Config("homelab").get("ciApiServer") ?? "https://100.70.179.36:6443",
 });
 export const ciAppsKubeconfig = ciAccess.kubeconfig;

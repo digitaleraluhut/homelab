@@ -39,7 +39,8 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
-    "@mrsimpson/homelab-config": "*"
+    "@mrsimpson/homelab-config": "*",
+    "@mrsimpson/homelab-core-components": "*"
   },
   "peerDependencies": {
     "@pulumi/cloudflare": "^5.42.0",
