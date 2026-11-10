@@ -59,7 +59,7 @@ export const redirectConfigMap = new k8s.core.v1.ConfigMap(
 }`,
     },
   },
-  { dependsOn: [oauth2ProxyNamespace] },
+  { dependsOn: [oauth2ProxyNamespace] }
 );
 
 // Deployment - runs a single nginx pod to serve redirects
@@ -135,7 +135,7 @@ export const redirectDeployment = new k8s.apps.v1.Deployment(
       },
     },
   },
-  { dependsOn: [redirectConfigMap] },
+  { dependsOn: [redirectConfigMap] }
 );
 
 // Service - exposes redirect handler to Traefik
@@ -162,7 +162,7 @@ export const redirectService = new k8s.core.v1.Service(
       ],
     },
   },
-  { dependsOn: [redirectDeployment] },
+  { dependsOn: [redirectDeployment] }
 );
 
 // Export the service address for use in ExposedWebApp

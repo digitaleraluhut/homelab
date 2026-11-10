@@ -1,5 +1,5 @@
-import * as k8s from "@pulumi/kubernetes";
 import { homelabConfig } from "@mrsimpson/homelab-config";
+import * as k8s from "@pulumi/kubernetes";
 
 /**
  * traefik-gateway - Gateway API-based HTTP(S) routing with Traefik

@@ -14,10 +14,10 @@
  *   pulumi config set grafanaAdminPassword <password> --secret
  */
 
+import { homelabConfig } from "@mrsimpson/homelab-config";
+import type { HomelabContext } from "@mrsimpson/homelab-core-components";
 import * as k8s from "@pulumi/kubernetes";
 import * as pulumi from "@pulumi/pulumi";
-import { homelabConfig } from "@mrsimpson/homelab-config";
-import { HomelabContext } from "@mrsimpson/homelab-core-components";
 import { createAppDashboardVolume, createDashboardConfigMaps } from "./dashboards";
 
 const config = new pulumi.Config();
@@ -89,7 +89,7 @@ export function setupObservability(args: ObservabilityArgs) {
         },
       },
     },
-    { dependsOn: [namespace] },
+    { dependsOn: [namespace] }
   );
 
   // kube-state-metrics — Kubernetes object metrics (Deployments, Pods, etc.)
@@ -117,7 +117,7 @@ export function setupObservability(args: ObservabilityArgs) {
         },
       },
     },
-    { dependsOn: [namespace] },
+    { dependsOn: [namespace] }
   );
 
   // VictoriaMetrics single-node
@@ -163,16 +163,12 @@ export function setupObservability(args: ObservabilityArgs) {
                   kubernetes_sd_configs: [{ role: "pod" }],
                   relabel_configs: [
                     {
-                      source_labels: [
-                        "__meta_kubernetes_pod_annotation_prometheus_io_scrape",
-                      ],
+                      source_labels: ["__meta_kubernetes_pod_annotation_prometheus_io_scrape"],
                       action: "keep",
                       regex: "true",
                     },
                     {
-                      source_labels: [
-                        "__meta_kubernetes_pod_annotation_prometheus_io_path",
-                      ],
+                      source_labels: ["__meta_kubernetes_pod_annotation_prometheus_io_path"],
                       action: "replace",
                       target_label: "__metrics_path__",
                       regex: "(.+)",
@@ -207,9 +203,7 @@ export function setupObservability(args: ObservabilityArgs) {
                   kubernetes_sd_configs: [{ role: "endpoints" }],
                   relabel_configs: [
                     {
-                      source_labels: [
-                        "__meta_kubernetes_service_annotation_prometheus_io_scrape",
-                      ],
+                      source_labels: ["__meta_kubernetes_service_annotation_prometheus_io_scrape"],
                       action: "keep",
                       regex: "true",
                     },
@@ -242,8 +236,7 @@ export function setupObservability(args: ObservabilityArgs) {
                   job_name: "kubelet",
                   scheme: "https",
                   tls_config: { insecure_skip_verify: true },
-                  bearer_token_file:
-                    "/var/run/secrets/kubernetes.io/serviceaccount/token",
+                  bearer_token_file: "/var/run/secrets/kubernetes.io/serviceaccount/token",
                   kubernetes_sd_configs: [{ role: "node" }],
                   relabel_configs: [
                     {
@@ -257,8 +250,7 @@ export function setupObservability(args: ObservabilityArgs) {
                   job_name: "cadvisor",
                   scheme: "https",
                   tls_config: { insecure_skip_verify: true },
-                  bearer_token_file:
-                    "/var/run/secrets/kubernetes.io/serviceaccount/token",
+                  bearer_token_file: "/var/run/secrets/kubernetes.io/serviceaccount/token",
                   kubernetes_sd_configs: [{ role: "node" }],
                   relabel_configs: [
                     {
@@ -308,9 +300,7 @@ export function setupObservability(args: ObservabilityArgs) {
                 // llama.cpp — one job per model (discovered from /v1/models API)
                 ...models.map((model) => ({
                   job_name: `llama-cpp-${model.replace(/[^a-z0-9-]/gi, "-")}`,
-                  static_configs: [
-                    { targets: [LLAMA_CPP_HOST], labels: { model } },
-                  ],
+                  static_configs: [{ targets: [LLAMA_CPP_HOST], labels: { model } }],
                   metrics_path: "/metrics",
                   params: { model: [model] },
                   scrape_interval: "30s",
@@ -324,7 +314,7 @@ export function setupObservability(args: ObservabilityArgs) {
         serviceAccount: { create: true },
       },
     },
-    { dependsOn: [namespace, nodeExporter, kubeStateMetrics] },
+    { dependsOn: [namespace, nodeExporter, kubeStateMetrics] }
   );
 
   // Datasource provisioning file for Grafana
@@ -348,7 +338,7 @@ datasources:
 `,
       },
     },
-    { dependsOn: [namespace] },
+    { dependsOn: [namespace] }
   );
 
   // Dashboard provisioning — tells Grafana where to load dashboard JSON files
@@ -375,7 +365,7 @@ providers:
 `,
       },
     },
-    { dependsOn: [namespace] },
+    { dependsOn: [namespace] }
   );
 
   // Dashboard JSON files — loaded from src/dashboards/json/ at build time
@@ -402,7 +392,7 @@ providers:
         resources: { requests: { storage: "100Mi" } },
       },
     },
-    { dependsOn: [namespace], customTimeouts: { create: "1s" } },
+    { dependsOn: [namespace], customTimeouts: { create: "1s" } }
   );
 
   // Grafana — routing delegated to HomelabContext (HTTPRoute + DNS via shared infra)
@@ -465,7 +455,7 @@ providers:
         appDashboardsPvc,
         ...dashboardConfigMaps,
       ],
-    },
+    }
   );
 
   return {

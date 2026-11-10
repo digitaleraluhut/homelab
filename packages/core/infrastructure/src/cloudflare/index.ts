@@ -1,8 +1,8 @@
-import * as pulumi from "@pulumi/pulumi";
+import { homelabConfig } from "@mrsimpson/homelab-config";
 import * as cloudflare from "@pulumi/cloudflare";
 import * as k8s from "@pulumi/kubernetes";
+import * as pulumi from "@pulumi/pulumi";
 import * as random from "@pulumi/random";
-import { homelabConfig } from "@mrsimpson/homelab-config";
 import { traefik } from "../traefik-gateway";
 
 /**

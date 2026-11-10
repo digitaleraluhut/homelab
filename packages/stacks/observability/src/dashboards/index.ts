@@ -1,7 +1,7 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import * as k8s from "@pulumi/kubernetes";
 import * as pulumi from "@pulumi/pulumi";
-import * as fs from "fs";
-import * as path from "path";
 
 export interface DashboardVolume {
   volume: object;
@@ -37,18 +37,17 @@ async function fetchDashboardJson(id: number): Promise<string> {
  * custom dashboards from src/dashboards/json/. Returns ConfigMaps and
  * volume definitions for the Grafana pod.
  */
-export function createDashboardConfigMaps(
-  namespace: k8s.core.v1.Namespace,
-): { configMaps: k8s.core.v1.ConfigMap[]; volumes: DashboardVolume[] } {
+export function createDashboardConfigMaps(namespace: k8s.core.v1.Namespace): {
+  configMaps: k8s.core.v1.ConfigMap[];
+  volumes: DashboardVolume[];
+} {
   const configMaps: k8s.core.v1.ConfigMap[] = [];
   const volumes: DashboardVolume[] = [];
 
   // Community dashboards — fetched from grafana.com at pulumi up time
   const communityData: Record<string, pulumi.Output<string>> = {};
   for (const dashboard of COMMUNITY_DASHBOARDS) {
-    communityData[`${dashboard.name}.json`] = pulumi.output(
-      fetchDashboardJson(dashboard.id),
-    );
+    communityData[`${dashboard.name}.json`] = pulumi.output(fetchDashboardJson(dashboard.id));
   }
 
   const communityCm = new k8s.core.v1.ConfigMap(
@@ -60,7 +59,7 @@ export function createDashboardConfigMaps(
       },
       data: communityData,
     },
-    { dependsOn: [namespace] },
+    { dependsOn: [namespace] }
   );
   configMaps.push(communityCm);
   volumes.push({
@@ -93,7 +92,7 @@ export function createDashboardConfigMaps(
           },
           data: customData,
         },
-        { dependsOn: [namespace] },
+        { dependsOn: [namespace] }
       );
       configMaps.push(customCm);
       volumes.push({

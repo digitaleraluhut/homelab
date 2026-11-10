@@ -31,7 +31,7 @@ export function callbackUrl(group: string, domain: string): string {
 export function buildHelmExtraArgs(
   group: string,
   config: GroupConfig,
-  domain: string,
+  domain: string
 ): Record<string, string> {
   const args: Record<string, string> = {
     provider: "github",
@@ -53,7 +53,7 @@ export function buildHelmExtraArgs(
   };
 
   if (config.scopes && config.scopes.length > 0) {
-    args["scope"] = config.scopes.join(" ");
+    args.scope = config.scopes.join(" ");
   }
 
   return args;

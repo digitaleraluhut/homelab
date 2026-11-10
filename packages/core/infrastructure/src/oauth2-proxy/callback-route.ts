@@ -1,12 +1,12 @@
+import { homelabConfig } from "@mrsimpson/homelab-config";
 import * as cloudflare from "@pulumi/cloudflare";
 import * as k8s from "@pulumi/kubernetes";
 import * as pulumi from "@pulumi/pulumi";
-import { homelabConfig } from "@mrsimpson/homelab-config";
 import { tunnelCname } from "../cloudflare";
-import { oauth2ProxyNamespace } from "./namespace";
-import { releases } from "./oauth2-proxy";
 import { groups } from "./groups";
 import { callbackUrl } from "./helpers";
+import { oauth2ProxyNamespace } from "./namespace";
+import { releases } from "./oauth2-proxy";
 
 /**
  * OAuth2-Proxy Callback IngressRoute
@@ -33,9 +33,7 @@ const defaultGroup = Object.keys(groups)[0]!;
 
 // Collect all release names needed for routing
 const groupEntries = Object.entries(groups);
-const allReleaseNames = pulumi.all(
-  groupEntries.map(([group]) => releases[group]!.name),
-);
+const allReleaseNames = pulumi.all(groupEntries.map(([group]) => releases[group]!.name));
 
 // StripPrefix middlewares for non-default groups — created eagerly (outside apply)
 // so Pulumi can track them as discrete resources.
@@ -57,7 +55,7 @@ for (const [group] of groupEntries) {
         },
       },
     },
-    { dependsOn: Object.values(releases) },
+    { dependsOn: Object.values(releases) }
   );
 }
 
@@ -124,11 +122,8 @@ export const callbackRoute = allReleaseNames.apply((names) => {
       },
     },
     {
-      dependsOn: [
-        ...Object.values(releases),
-        ...Object.values(stripMiddlewares),
-      ],
-    },
+      dependsOn: [...Object.values(releases), ...Object.values(stripMiddlewares)],
+    }
   );
 });
 
@@ -149,6 +144,4 @@ export const callbackHostname = callbackHost;
  * https://oauth.{domain}/oauth2/callback          — users (default)
  * https://oauth.{domain}/developers/oauth2/callback — developers
  */
-export const callbackUrls = Object.keys(groups).map((g) =>
-  callbackUrl(g, domain),
-);
+export const callbackUrls = Object.keys(groups).map((g) => callbackUrl(g, domain));

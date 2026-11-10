@@ -1,5 +1,5 @@
-import * as k8s from "@pulumi/kubernetes";
-import * as pulumi from "@pulumi/pulumi";
+import type * as k8s from "@pulumi/kubernetes";
+import type * as pulumi from "@pulumi/pulumi";
 import type {
   CloudflareConfig,
   ExposedWebAppArgs,

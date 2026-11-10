@@ -5,17 +5,13 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
+    "build": "tsc --noEmit",
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
     "format": "biome format --write src/",
     "type-check": "tsc --noEmit"
   },
-  "keywords": [
-    "pulumi",
-    "homelab",
-    "configuration",
-    "infrastructure"
-  ],
+  "keywords": ["pulumi", "homelab", "configuration", "infrastructure"],
   "author": "mrsimpson",
   "license": "MIT",
   "repository": {
