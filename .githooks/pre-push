@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+# Pulumi preview to catch infrastructure errors before the push.
+# Enable once per clone: git config core.hooksPath .githooks
+command -v pulumi >/dev/null 2>&1 || { echo "pre-push: pulumi not found, preview skipped."; exit 0; }
+echo "pre-push: running pulumi preview..."
+pulumi preview --non-interactive --suppress-outputs || {
+  echo "pre-push: pulumi preview failed. Fix errors before pushing." >&2
+  exit 1
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Commit format of the operator agent: same rule as the CI check agent-commit-format,
 # caught before the push. Only commits authored by the operator App are checked.
-# Installed by husky (npm install).
+# Enable once per clone: git config core.hooksPath .githooks
 case "$(git var GIT_AUTHOR_IDENT)" in
   *"+digitaleraluhut-operator[bot]@users.noreply.github.com>"*) ;;
   *) exit 0 ;;

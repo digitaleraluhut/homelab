@@ -107,11 +107,10 @@ aioperator_gitleaks_url: >-
   }}/gitleaks_{{ aioperator_gitleaks_version }}_linux_x64.tar.gz
 aioperator_gitleaks_headers: {}
 
-# Activate each repository's own hooks in the operator's checkouts (worktrees
-# share the setting). githooks: core.hooksPath=.githooks; husky: run husky,
-# which sets core.hooksPath=.husky/_ (needs node_modules).
+# Activate each repository's own hooks in the operator's checkouts
+# (core.hooksPath=.githooks; worktrees share the setting and carry the files).
 aioperator_workspace: "{{ aioperator_home }}/projects/digitaleraluhut"
 aioperator_repo_hooks:
-  homelab: husky
+  homelab: githooks
   homelab-apps: githooks
   local-ai: githooks

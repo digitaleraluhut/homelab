@@ -58,16 +58,3 @@
     label: "{{ item.item.key }}"
   when: item.item.value == 'githooks' and item.rc != 128 and item.stdout != '.githooks'
   changed_when: true
-
-- name: Activate husky (sets core.hooksPath to .husky/_)
-  become: true
-  become_user: "{{ aioperator_user }}"
-  ansible.builtin.command:
-    cmd: node_modules/.bin/husky
-    chdir: "{{ aioperator_workspace }}/{{ item.item.key }}"
-    removes: "{{ aioperator_workspace }}/{{ item.item.key }}/node_modules/.bin/husky"
-  loop: "{{ aioperator_hookspaths.results }}"
-  loop_control:
-    label: "{{ item.item.key }}"
-  when: item.item.value == 'husky' and item.rc != 128 and item.stdout != '.husky/_'
-  changed_when: true

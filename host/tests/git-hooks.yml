@@ -17,12 +17,17 @@
         aioperator_gitleaks_link: "{{ out }}/bin/gitleaks"
         aioperator_gitleaks_owner: "{{ lookup('env', 'USER') }}"
         aioperator_workspace: "{{ out }}/ws"
-        aioperator_repo_hooks: {githooks-repo: githooks, missing-repo: githooks}
+        aioperator_repo_hooks: {githooks-repo: githooks, former-husky-repo: githooks, missing-repo: githooks}
 
     - name: Create scratch directories and a repository  # noqa: command-instead-of-module
       ansible.builtin.command:
         cmd: "git init -q {{ out }}/ws/githooks-repo"
         creates: "{{ out }}/ws/githooks-repo/.git"
+
+    - name: Create a repository still pointing at husky  # noqa: command-instead-of-module
+      ansible.builtin.shell:
+        cmd: "git init -q {{ out }}/ws/former-husky-repo && git -C {{ out }}/ws/former-husky-repo config core.hooksPath .husky/_"
+        creates: "{{ out }}/ws/former-husky-repo/.git"
 
     - name: Create the link directory
       ansible.builtin.file:
@@ -40,6 +45,13 @@
       register: hooks_path
       changed_when: false
       failed_when: hooks_path.stdout != '.githooks'
+
+    - name: Check the former husky repository was switched  # noqa: command-instead-of-module
+      ansible.builtin.command:
+        cmd: "git -C {{ out }}/ws/former-husky-repo config --get core.hooksPath"
+      register: husky_path
+      changed_when: false
+      failed_when: husky_path.stdout != '.githooks'
 
     - name: Check gitleaks runs
       ansible.builtin.command:
