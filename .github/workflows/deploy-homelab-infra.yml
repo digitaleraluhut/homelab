@@ -95,6 +95,11 @@ jobs:
           sudo mv sops-v3.11.0.linux.amd64 /usr/local/bin/sops
           sudo chmod +x /usr/local/bin/sops
 
+      # restore-config.sh calls the pulumi CLI. The runner image no longer ships it
+      # (restore failed with FileNotFoundError: 'pulumi' since 2026-11-09), so install it first.
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v6
+
       - name: Restore Pulumi config from SOPS
         run: |
           export SOPS_AGE_KEY="${{ secrets.SOPS_AGE_KEY }}"
