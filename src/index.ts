@@ -68,7 +68,7 @@ import { createCiAccess } from "@mrsimpson/homelab-core-infrastructure";
 // Namespaces created by the app stacks themselves.
 const existingNamespaces = ["aftertouch", "code", "librechat"];
 // "wiki" is NOT in existingNamespaces on purpose: it is created here and apps/wiki only references it.
-const appNamespaces = [...existingNamespaces, "wiki"];
+const appNamespaces = [...existingNamespaces, "wiki", "opencode"];
 const ciAccess = createCiAccess({
   appNamespaces,
   existingNamespaces,
