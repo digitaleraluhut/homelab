@@ -93,14 +93,10 @@ export const grafanaUrl = observability.grafanaUrl;
 
 // Applications - Import and create applications here
 import { createHelloWorld } from "@mrsimpson/homelab-app-hello-world";
-import { createNodejsDemo } from "@mrsimpson/homelab-app-nodejs-demo";
 import { AuthType } from "@mrsimpson/homelab-core-components";
 
 const helloWorldApp = createHelloWorld(homelab);
 export const helloWorldUrl = helloWorldApp.url;
-
-const nodejsDemoApp = createNodejsDemo(homelab);
-export const nodejsDemoUrl = nodejsDemoApp.url;
 
 // Demo / smoke-test app: Storage validator — simple nginx-based storage test with automatic R2 backups
 const rootDomain = homelabConfig.domain;
