@@ -107,10 +107,6 @@ aioperator_gitleaks_url: >-
   }}/gitleaks_{{ aioperator_gitleaks_version }}_linux_x64.tar.gz
 aioperator_gitleaks_headers: {}
 
-# Activate each repository's own hooks in the operator's checkouts
-# (core.hooksPath=.githooks; worktrees share the setting and carry the files).
+# Checkouts in the workspace that contain .githooks/ get core.hooksPath=.githooks
+# (worktrees share the setting and carry the files).
 aioperator_workspace: "{{ aioperator_home }}/projects/digitaleraluhut"
-aioperator_repo_hooks:
-  homelab: githooks
-  homelab-apps: githooks
-  local-ai: githooks

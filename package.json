@@ -5,6 +5,7 @@
   "description": "Personal homelab infrastructure as code",
   "workspaces": ["packages/*", "packages/core/*", "packages/stacks/*", "packages/demo-apps/*"],
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
     "format": "biome format --write src/",

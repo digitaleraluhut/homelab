@@ -26,7 +26,8 @@ This installs:
 
 ### 2. Activate the Git Hooks
 
-The hooks live in `.githooks/` (tracked, so every clone and worktree has them). Once per clone:
+The hooks live in `.githooks/` (tracked, so every clone and worktree has them). `npm install`
+activates them (`prepare` script); by hand:
 
 ```bash
 git config core.hooksPath .githooks
