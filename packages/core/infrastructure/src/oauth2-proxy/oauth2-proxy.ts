@@ -1,14 +1,10 @@
 import * as k8s from "@pulumi/kubernetes";
 import * as pulumi from "@pulumi/pulumi";
+import { configMaps } from "./email-configmaps";
 import { groups } from "./groups";
-import {
-  buildChecksum,
-  buildEmailContent,
-  buildHelmExtraArgs,
-} from "./helpers";
+import { buildChecksum, buildEmailContent, buildHelmExtraArgs } from "./helpers";
 import { oauth2ProxyNamespace } from "./namespace";
 import { oauth2ProxySecret } from "./secrets";
-import { configMaps } from "./email-configmaps";
 
 /**
  * OAuth2-Proxy Helm Releases
@@ -38,10 +34,7 @@ for (const [group, config] of Object.entries(groups)) {
   // Use a dedicated secret when the group has its own GitHub App, otherwise
   // fall back to the shared secret.
   let secretName = "oauth2-proxy-github";
-  const deps: pulumi.Resource[] = [
-    oauth2ProxySecret,
-    configMaps[group] as k8s.core.v1.ConfigMap,
-  ];
+  const deps: pulumi.Resource[] = [oauth2ProxySecret, configMaps[group] as k8s.core.v1.ConfigMap];
 
   if (config.app) {
     const groupSecret = new k8s.core.v1.Secret(
@@ -58,7 +51,7 @@ for (const [group, config] of Object.entries(groups)) {
           "cookie-secret": cfg.requireSecret(config.app.cookieSecretKey),
         },
       },
-      { dependsOn: [oauth2ProxyNamespace] },
+      { dependsOn: [oauth2ProxyNamespace] }
     );
     secretName = `oauth2-proxy-${group}`;
     deps.push(groupSecret);
@@ -99,7 +92,7 @@ for (const [group, config] of Object.entries(groups)) {
         },
       },
     },
-    { dependsOn: deps },
+    { dependsOn: deps }
   );
 }
 

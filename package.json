@@ -5,10 +5,12 @@
   "description": "Personal homelab infrastructure as code",
   "workspaces": ["packages/*", "packages/core/*", "packages/stacks/*", "packages/demo-apps/*"],
   "scripts": {
-    "lint": "biome check src/",
-    "lint:fix": "biome check --write src/",
-    "format": "biome format --write src/",
-    "type-check": "tsc --noEmit",
+    "lint": "biome check packages src",
+    "lint:fix": "biome check --write packages src",
+    "format": "biome format --write packages src",
+    "build": "npm run build --workspaces",
+    "type-check": "npm run build && tsc --noEmit",
+    "test": "vitest run",
     "preview": "pulumi preview",
     "up": "pulumi up",
     "destroy": "pulumi destroy"
@@ -38,7 +40,8 @@
     "lint-staged": "^15.2.11",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   },
   "dependencies": {
     "@mrsimpson/homelab-config": "*",

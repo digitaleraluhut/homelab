@@ -1,10 +1,6 @@
-import * as pulumi from "@pulumi/pulumi";
+import type * as pulumi from "@pulumi/pulumi";
+import type { ExternalSecretsConfig, GatewayApiConfig, TLSConfig } from "./ExposedWebApp";
 import { HomelabContext } from "./homelab-context";
-import type {
-  ExternalSecretsConfig,
-  GatewayApiConfig,
-  TLSConfig,
-} from "./ExposedWebApp";
 
 /**
  * Optional overrides for infrastructure configuration that cannot be derived

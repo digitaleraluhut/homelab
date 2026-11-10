@@ -4,10 +4,7 @@
   "description": "Reusable Pulumi components for secure homelab infrastructure",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": [
-    "dist",
-    "src"
-  ],
+  "files": ["dist", "src"],
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",

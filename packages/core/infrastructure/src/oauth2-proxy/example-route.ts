@@ -1,6 +1,6 @@
+import { homelabConfig } from "@mrsimpson/homelab-config";
 import * as cloudflare from "@pulumi/cloudflare";
 import * as k8s from "@pulumi/kubernetes";
-import { homelabConfig } from "@mrsimpson/homelab-config";
 import { tunnelCname } from "../cloudflare";
 import { oauth2ProxyNamespace } from "./namespace";
 
@@ -120,7 +120,7 @@ const forwardAuthMiddleware = new k8s.apiextensions.CustomResource(
     spec: {
       forwardAuth: {
         // Use /oauth2/auth - returns 200 if session valid, 401 if not
-        address: `http://oauth2-proxy-users.oauth2-proxy.svc.cluster.local/oauth2/auth`,
+        address: "http://oauth2-proxy-users.oauth2-proxy.svc.cluster.local/oauth2/auth",
         trustForwardHeader: true,
         // Forward Cookie header from browser request to oauth2-proxy
         // Without this, oauth2-proxy won't see the session cookie!
@@ -271,16 +271,13 @@ export const exampleRoute = new k8s.apiextensions.CustomResource(
 
 // --- DNS ---
 
-export const exampleDnsRecord = new cloudflare.Record(
-  "oauth2-example-dns",
-  {
-    zoneId: homelabConfig.cloudflare.zoneId,
-    name: appHost,
-    type: "CNAME",
-    content: tunnelCname,
-    proxied: true,
-    comment: "Managed by Pulumi - oauth2-example (OAuth2-Proxy protected)",
-  }
-);
+export const exampleDnsRecord = new cloudflare.Record("oauth2-example-dns", {
+  zoneId: homelabConfig.cloudflare.zoneId,
+  name: appHost,
+  type: "CNAME",
+  content: tunnelCname,
+  proxied: true,
+  comment: "Managed by Pulumi - oauth2-example (OAuth2-Proxy protected)",
+});
 
 export const exampleAppHostname = appHost;

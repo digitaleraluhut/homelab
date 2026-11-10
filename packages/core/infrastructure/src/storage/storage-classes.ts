@@ -58,7 +58,7 @@ export const persistentStorageClass = new k8s.storage.v1.StorageClass(
   },
   {
     dependsOn: [longhorn],
-  },
+  }
 );
 
 /**
@@ -84,8 +84,7 @@ export const uncriticalStorageClass = new k8s.storage.v1.StorageClass(
       },
       annotations: {
         "storageclass.kubernetes.io/is-default-class": "false",
-        "homelab/description":
-          "Ephemeral storage without backups — deleted with PVC",
+        "homelab/description": "Ephemeral storage without backups — deleted with PVC",
         "homelab/backup-schedule": "none",
         "homelab/retention": "none",
       },
@@ -105,7 +104,7 @@ export const uncriticalStorageClass = new k8s.storage.v1.StorageClass(
   },
   {
     dependsOn: [longhorn],
-  },
+  }
 );
 
 // Only export the clean, intent-based storage classes

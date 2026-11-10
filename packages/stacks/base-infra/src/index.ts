@@ -5,11 +5,11 @@
  * for dependency injection into app stacks.
  */
 
-import * as pulumi from "@pulumi/pulumi";
-import * as k8s from "@pulumi/kubernetes";
-import * as coreInfra from "@mrsimpson/homelab-core-infrastructure";
-import { baseInfraConfig } from "./config";
 import { HomelabContext } from "@mrsimpson/homelab-core-components";
+import * as coreInfra from "@mrsimpson/homelab-core-infrastructure";
+import * as k8s from "@pulumi/kubernetes";
+import * as pulumi from "@pulumi/pulumi";
+import { baseInfraConfig } from "./config";
 
 // Export config for reference in other stacks
 export { baseInfraConfig };

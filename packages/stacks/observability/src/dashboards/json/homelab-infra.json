@@ -30,9 +30,7 @@
       "fieldConfig": {
         "defaults": {
           "thresholds": {
-            "steps": [
-              { "color": "green", "value": null }
-            ]
+            "steps": [{ "color": "green", "value": null }]
           }
         }
       }
@@ -228,9 +226,7 @@
         "defaults": {
           "unit": "reqps",
           "thresholds": {
-            "steps": [
-              { "color": "green", "value": null }
-            ]
+            "steps": [{ "color": "green", "value": null }]
           }
         }
       }

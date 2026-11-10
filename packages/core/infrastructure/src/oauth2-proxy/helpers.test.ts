@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildChecksum,
-  buildEmailContent,
-  buildHelmExtraArgs,
-} from "./helpers";
+import { buildChecksum, buildEmailContent, buildHelmExtraArgs } from "./helpers";
 
 describe("buildEmailContent", () => {
   it("joins emails with newline", () => {
@@ -41,7 +37,7 @@ describe("buildHelmExtraArgs", () => {
 
   it("omits scope key when no scopes configured", () => {
     const args = buildHelmExtraArgs("users", { emails: baseEmails }, "example.com");
-    expect(args["scope"]).toBeUndefined();
+    expect(args.scope).toBeUndefined();
   });
 
   it("sets scope as space-joined string when scopes configured", () => {
@@ -50,13 +46,13 @@ describe("buildHelmExtraArgs", () => {
       { emails: baseEmails, scopes: ["user:email", "repo"] },
       "example.com"
     );
-    expect(args["scope"]).toBe("user:email repo");
+    expect(args.scope).toBe("user:email repo");
   });
 
   it("includes standard cookie and proxy args", () => {
     const args = buildHelmExtraArgs("mygroup", { emails: baseEmails }, "test.com");
     expect(args["cookie-name"]).toBe("_oauth2_mygroup");
     expect(args["cookie-domain"]).toBe(".test.com");
-    expect(args["provider"]).toBe("github");
+    expect(args.provider).toBe("github");
   });
 });
