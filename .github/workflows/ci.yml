@@ -1,0 +1,37 @@
+name: CI
+
+# Same checks as the local hooks: formatting/lint, types, tests; plus renovate.json.
+# No secrets, no Pulumi preview (needs credentials).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - name: Lint and format (biome)
+        run: npm run lint
+
+      - name: Types (builds all workspaces, then tsc)
+        run: npm run type-check
+
+      - name: Tests (vitest, all tests)
+        run: npm test
+
+      - name: Validate renovate.json
+        run: npm exec --yes --package=renovate@41 -- renovate-config-validator --strict renovate.json
