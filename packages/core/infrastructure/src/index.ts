@@ -22,3 +22,4 @@ export * from "./oauth2-proxy";
 export * from "./cnpg";
 export * from "./ci-access";
 export * from "./operator-access";
+export * from "./renovate";

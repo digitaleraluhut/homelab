@@ -152,3 +152,9 @@ export const longhornUI = {
   accessMethod: "portforward",
   command: "kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80",
 };
+
+// Self-hosted Renovate (issue #100): nightly CronJob with its own GitHub App.
+// Inert until the App credentials exist in Pulumi ESC, see docs/howto/setup-renovate.md.
+import { createRenovate, externalSecretsOperator } from "@mrsimpson/homelab-core-infrastructure";
+
+export const renovate = createRenovate({ externalSecretsOperator });

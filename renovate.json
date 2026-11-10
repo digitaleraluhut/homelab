@@ -1,0 +1,59 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests", ":dependencyDashboard"],
+  "timezone": "Europe/Berlin",
+  "schedule": ["after 1am and before 5am"],
+  "minimumReleaseAge": "3 days",
+  "prHourlyLimit": 5,
+  "prConcurrentLimit": 10,
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Group GitHub Actions",
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions"
+    },
+    {
+      "description": "Group dev dependencies",
+      "matchDepTypes": ["devDependencies"],
+      "groupName": "dev dependencies"
+    },
+    {
+      "description": "Group Pulumi SDKs",
+      "matchPackageNames": ["@pulumi/{/,}**"],
+      "groupName": "pulumi sdks"
+    },
+    {
+      "description": "Helm charts in the Pulumi code: reviewed, never auto-merged",
+      "matchDepNames": ["/helm-chart/"],
+      "groupName": "helm charts",
+      "automerge": false
+    },
+    {
+      "description": "Majors are never auto-merged",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "minimumReleaseAge": "3 days"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Helm charts in Pulumi code: // renovate: helm-chart repo=<url> chart=<name> above version",
+      "managerFilePatterns": ["/\\.ts$/"],
+      "matchStrings": [
+        "// renovate: helm-chart repo=(?<registryUrl>\\S+) chart=(?<depName>\\S+)\\s+version: \"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "helm"
+    },
+    {
+      "customType": "regex",
+      "description": "Container images in TS: // renovate: image above image: \"name:tag\"",
+      "managerFilePatterns": ["/\\.ts$/"],
+      "matchStrings": [
+        "// renovate: image\\s+image: \"(?<depName>[^:\"]+):(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ]
+}
