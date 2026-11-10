@@ -21,19 +21,21 @@ npm install
 This installs:
 - **Biome** - Linting + formatting
 - **TypeScript** - Type checking
-- **Husky** - Git hooks
 - **lint-staged** - Run checks only on changed files
 - **Pulumi packages** - Infrastructure SDKs
 
-### 2. Initialize Git Hooks
+### 2. Activate the Git Hooks
+
+The hooks live in `.githooks/` (tracked, so every clone and worktree has them). `npm install`
+activates them (`prepare` script); by hand:
 
 ```bash
-npm run prepare
+git config core.hooksPath .githooks
 ```
 
-This sets up:
-- **Pre-commit hook** - Auto-format, lint, type-check
-- **Pre-push hook** - Run Pulumi preview
+- **pre-commit** - gitleaks secrets scan, then lint-staged (format, lint, type-check; skipped without `node_modules`)
+- **commit-msg** - commits of the operator App need `## Intent` and `## Key changes`
+- **pre-push** - Pulumi preview (skipped without the `pulumi` CLI)
 
 ## What Gets Checked Automatically
 
@@ -206,9 +208,8 @@ git push --no-verify
 ### Hooks Not Running
 
 ```bash
-# Reinstall hooks
-rm -rf .husky
-npm run prepare
+git config --get core.hooksPath   # must print .githooks
+git config core.hooksPath .githooks
 ```
 
 ### Biome Errors

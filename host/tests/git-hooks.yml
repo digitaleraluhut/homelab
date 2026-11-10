@@ -17,12 +17,13 @@
         aioperator_gitleaks_link: "{{ out }}/bin/gitleaks"
         aioperator_gitleaks_owner: "{{ lookup('env', 'USER') }}"
         aioperator_workspace: "{{ out }}/ws"
-        aioperator_repo_hooks: {githooks-repo: githooks, missing-repo: githooks}
 
-    - name: Create scratch directories and a repository  # noqa: command-instead-of-module
-      ansible.builtin.command:
-        cmd: "git init -q {{ out }}/ws/githooks-repo"
-        creates: "{{ out }}/ws/githooks-repo/.git"
+    - name: Create a repository with .githooks and one without  # noqa: command-instead-of-module
+      ansible.builtin.shell:
+        cmd: >-
+          git init -q {{ out }}/ws/with-hooks && mkdir {{ out }}/ws/with-hooks/.githooks &&
+          git init -q {{ out }}/ws/without-hooks
+        creates: "{{ out }}/ws/with-hooks/.git"
 
     - name: Create the link directory
       ansible.builtin.file:
@@ -35,11 +36,13 @@
       loop: [1, 2]
 
     - name: Check the result  # noqa: command-instead-of-module
-      ansible.builtin.command:
-        cmd: "git -C {{ out }}/ws/githooks-repo config --get core.hooksPath"
+      ansible.builtin.shell:
+        cmd: >-
+          echo "$(git -C {{ out }}/ws/with-hooks config --get core.hooksPath)
+          $(git -C {{ out }}/ws/without-hooks config --get core.hooksPath)"
       register: hooks_path
       changed_when: false
-      failed_when: hooks_path.stdout != '.githooks'
+      failed_when: hooks_path.stdout | trim != '.githooks'
 
     - name: Check gitleaks runs
       ansible.builtin.command:

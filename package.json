@@ -5,6 +5,7 @@
   "description": "Personal homelab infrastructure as code",
   "workspaces": ["packages/*", "packages/core/*", "packages/stacks/*", "packages/demo-apps/*"],
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
     "format": "biome format --write src/",
@@ -34,7 +35,6 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^24.0.0",
-    "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",

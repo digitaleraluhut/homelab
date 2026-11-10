@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+# Secrets scan of staged changes (gitleaks), then lint-staged.
+# Enable once per clone: git config core.hooksPath .githooks
+command -v gitleaks >/dev/null 2>&1 || {
+  echo "pre-commit: gitleaks not found, commit aborted." >&2
+  echo "Install: https://github.com/gitleaks/gitleaks#installing" >&2
+  exit 1
+}
+gitleaks git --pre-commit --staged --config .github/gitleaks.toml \
+  --ignore-gitleaks-allow --redact --no-banner --verbose || exit 1
+
+# Format, lint and type-check staged files. Only the installed binary: a worktree
+# without node_modules must not let npx download packages.
+if [ -x node_modules/.bin/lint-staged ]; then
+  exec node_modules/.bin/lint-staged
+fi
+echo "pre-commit: node_modules missing, lint-staged skipped (run npm ci to format, lint and type-check)." >&2

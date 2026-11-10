@@ -36,38 +36,26 @@
     state: link
     force: true
 
-- name: Read the current hooksPath of the operator's checkouts  # noqa: command-instead-of-module
-  become: true
-  become_user: "{{ aioperator_user }}"
-  ansible.builtin.command:
-    cmd: git -C {{ aioperator_workspace }}/{{ item.key }} config --get core.hooksPath
-  loop: "{{ aioperator_repo_hooks | dict2items }}"
-  loop_control:
-    label: "{{ item.key }}"
-  register: aioperator_hookspaths
-  changed_when: false
-  failed_when: aioperator_hookspaths.rc not in [0, 1, 128]   # 1: unset, 128: no such repo
+- name: Find the checkouts that carry their own hooks (.githooks)
+  ansible.builtin.find:
+    paths: "{{ aioperator_workspace }}"
+    patterns: .githooks
+    file_type: directory
+    hidden: true
+    recurse: true
+    depth: 2
+  register: aioperator_githooks
 
-- name: Activate .githooks  # noqa: command-instead-of-module (no git config module in ansible-core)
+- name: Activate .githooks in each of them  # noqa: command-instead-of-module (no git config module in ansible-core)
   become: true
   become_user: "{{ aioperator_user }}"
-  ansible.builtin.command:
-    cmd: git -C {{ aioperator_workspace }}/{{ item.item.key }} config core.hooksPath .githooks
-  loop: "{{ aioperator_hookspaths.results }}"
+  ansible.builtin.shell:
+    cmd: >-
+      test "$(git -C {{ aioperator_hook_dir.path | dirname | quote }} config --get core.hooksPath)" = .githooks
+      || { git -C {{ aioperator_hook_dir.path | dirname | quote }} config core.hooksPath .githooks && echo switched; }
+  loop: "{{ aioperator_githooks.files }}"
   loop_control:
-    label: "{{ item.item.key }}"
-  when: item.item.value == 'githooks' and item.rc != 128 and item.stdout != '.githooks'
-  changed_when: true
-
-- name: Activate husky (sets core.hooksPath to .husky/_)
-  become: true
-  become_user: "{{ aioperator_user }}"
-  ansible.builtin.command:
-    cmd: node_modules/.bin/husky
-    chdir: "{{ aioperator_workspace }}/{{ item.item.key }}"
-    removes: "{{ aioperator_workspace }}/{{ item.item.key }}/node_modules/.bin/husky"
-  loop: "{{ aioperator_hookspaths.results }}"
-  loop_control:
-    label: "{{ item.item.key }}"
-  when: item.item.value == 'husky' and item.rc != 128 and item.stdout != '.husky/_'
-  changed_when: true
+    loop_var: aioperator_hook_dir
+    label: "{{ aioperator_hook_dir.path | dirname | basename }}"
+  register: aioperator_hooks_switch
+  changed_when: "'switched' in aioperator_hooks_switch.stdout"
