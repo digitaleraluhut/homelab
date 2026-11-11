@@ -492,7 +492,10 @@ export class ExposedWebApp extends pulumi.ComponentResource {
       volumes.push({
         name: "storage",
         persistentVolumeClaim: {
-          claimName: this.pvc.metadata.name,
+          // The fixed name, not this.pvc.metadata.name: an output would make the Deployment
+          // wait for the PVC, which on WaitForFirstConsumer classes binds only once a pod
+          // uses it (deadlock). The pod waits for the claim by itself.
+          claimName: `${name}-storage`,
         },
       });
     }
