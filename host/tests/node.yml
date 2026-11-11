@@ -1,0 +1,38 @@
+---
+# Runs the node tasks against a scratch directory: downloads and verifies
+# Node.js and links it.
+# Run: ansible-playbook tests/node.yml -e out=$(mktemp -d)
+- name: Install Node.js for the operator (scratch)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../roles/aioperator/defaults/main.yml
+  tasks:
+    # set_fact: vars_files would win over play vars.
+    - name: Point everything at the scratch directory
+      ansible.builtin.set_fact:
+        aioperator_node_dir: "{{ out }}/nodejs/{{ aioperator_node_version }}"
+        aioperator_node_owner: "{{ lookup('env', 'USER') }}"
+        aioperator_node_link_dir: "{{ out }}/bin"
+
+    - name: Create the scratch directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop: ["{{ out }}/nodejs", "{{ out }}/bin"]
+
+    - name: Run the role's tasks (twice, for idempotence)
+      ansible.builtin.include_tasks: ../roles/aioperator/tasks/node.yml
+      loop: [1, 2]
+
+    - name: Check node and npm run from the links
+      ansible.builtin.command:
+        cmd: "{{ out }}/bin/{{ item.cmd }} --version"
+      register: v
+      changed_when: false
+      failed_when: item.expect not in v.stdout
+      loop:
+        - {cmd: node, expect: "v{{ aioperator_node_version }}"}
+        - {cmd: npm, expect: "."}
