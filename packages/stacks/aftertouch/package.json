@@ -1,0 +1,29 @@
+{
+  "name": "@mrsimpson/homelab-aftertouch",
+  "version": "0.1.0",
+  "description": "AfterTouch (Bose SoundTouch local cloud replacement), a privileged LAN workload",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "type-check": "tsc --noEmit"
+  },
+  "author": "mrsimpson",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/digitaleraluhut/homelab.git",
+    "directory": "packages/stacks/aftertouch"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.7.0"
+  },
+  "peerDependencies": {
+    "@pulumi/kubernetes": "^4.18.3",
+    "@pulumi/pulumi": "^3.137.0"
+  }
+}

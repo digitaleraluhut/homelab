@@ -81,6 +81,14 @@ const observability = setupObservability({ homelab });
 
 export const grafanaUrl = observability.grafanaUrl;
 
+// AfterTouch — privileged LAN workload (hostNetwork, NodePorts), therefore here and not in
+// homelab-apps. Moved from stack mrsimpson/aftertouch/dev (see packages/stacks/aftertouch).
+import { setupAftertouch } from "@mrsimpson/homelab-aftertouch";
+
+const aftertouch = setupAftertouch();
+export const aftertouchUrl = aftertouch.url;
+export const aftertouchWebUiUrl = aftertouch.webUiUrl;
+
 // Applications - Import and create applications here
 import { createHelloWorld } from "@mrsimpson/homelab-app-hello-world";
 import { AuthType } from "@mrsimpson/homelab-core-components";
