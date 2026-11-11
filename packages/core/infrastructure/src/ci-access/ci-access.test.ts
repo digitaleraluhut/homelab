@@ -91,14 +91,25 @@ describe("createCiAccess", () => {
     }
   });
 
-  it("grants no exec, port-forward or cluster-scoped writes in the deployer role", () => {
+  it("grants pods/exec (create, get) so app stacks can create Roles that include it", () => {
+    const role = created.find(
+      (c) => c.name === "ci-homelab-apps-deployer" && c.type.endsWith("ClusterRole")
+    );
+    const rules = role?.inputs.rules as { resources: string[]; verbs: string[] }[];
+    const exec = rules.filter((r) => r.resources.includes("pods/exec"));
+    expect(exec).toHaveLength(1);
+    expect(exec[0].resources).toEqual(["pods/exec"]);
+    expect([...exec[0].verbs].sort()).toEqual(["create", "get"]);
+  });
+
+  it("grants no port-forward or cluster-scoped writes in the deployer role", () => {
     const role = created.find(
       (c) => c.name === "ci-homelab-apps-deployer" && c.type.endsWith("ClusterRole")
     );
     const resources = (role?.inputs.rules as { resources: string[] }[]).flatMap((r) => r.resources);
     for (const forbidden of [
-      "pods/exec",
       "pods/portforward",
+      "pods/attach",
       "namespaces",
       "clusterroles",
       "clusterrolebindings",
