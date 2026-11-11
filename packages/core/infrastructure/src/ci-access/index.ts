@@ -22,7 +22,7 @@ import * as pulumi from "@pulumi/pulumi";
  *   `homelab/deployer: homelab-apps` and pod-security `restricted`; it cannot change or delete
  *   any other namespace, and creates RoleBindings only in its own namespaces.
  * - observability: the opencode dashboard ConfigMap + its sync Job.
- * - No other cluster-scoped writes, no pods/exec or port-forward anywhere.
+ * - No other cluster-scoped writes, no port-forward or attach; pods/exec only in its own namespaces.
  *
  * Get the kubeconfig for the GitHub environment secret:
  *   pulumi stack output ciAppsKubeconfig --show-secrets | base64 | tr -d '\n'
@@ -60,6 +60,10 @@ const appDeployerRules: k8s.types.input.rbac.v1.PolicyRule[] = [
     ],
     verbs: ALL,
   },
+  // Kubernetes only lets the CI create a Role with rights it holds itself. opencode-router's Role
+  // execs into its sandbox pods, so the CI needs pods/exec too. Same reach as the secrets above:
+  // only in the CI's own namespaces, which all enforce pod-security restricted.
+  { apiGroups: [""], resources: ["pods/exec"], verbs: ["create", "get"] },
   {
     apiGroups: ["apps"],
     resources: ["deployments", "replicasets", "statefulsets", "daemonsets"],
