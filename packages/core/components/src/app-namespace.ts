@@ -46,9 +46,15 @@ export function createAppNamespace(name: string, opts?: pulumi.CustomResourceOpt
     },
     { ...opts, dependsOn: [created] }
   );
-  const namespace = k8s.core.v1.Namespace.get(`${name}-ns-ready`, binding.metadata.namespace, {
-    ...opts,
-    dependsOn: [binding],
-  });
+  // The ID comes from binding.id, which is unknown until the RoleBinding really exists, so a
+  // preview of a first deploy does not try to read a namespace that is not there yet.
+  const namespace = k8s.core.v1.Namespace.get(
+    `${name}-ns-ready`,
+    binding.id.apply(() => name),
+    {
+      ...opts,
+      dependsOn: [binding],
+    }
+  );
   return { namespace, binding };
 }
