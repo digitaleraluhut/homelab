@@ -43,6 +43,17 @@ export const operatorClusterReadRules: k8s.types.input.rbac.v1.PolicyRule[] = [
   { apiGroups: ["node.k8s.io"], resources: ["runtimeclasses"], verbs: READ },
   { apiGroups: ["scheduling.k8s.io"], resources: ["priorityclasses"], verbs: READ },
   { apiGroups: ["apiregistration.k8s.io"], resources: ["apiservices"], verbs: READ },
+  // Admission policies and webhooks: lets the operator check the CI fences (ci-access).
+  {
+    apiGroups: ["admissionregistration.k8s.io"],
+    resources: [
+      "validatingadmissionpolicies",
+      "validatingadmissionpolicybindings",
+      "validatingwebhookconfigurations",
+      "mutatingwebhookconfigurations",
+    ],
+    verbs: READ,
+  },
   { apiGroups: ["metrics.k8s.io"], resources: ["nodes", "pods"], verbs: READ },
   {
     apiGroups: ["rbac.authorization.k8s.io"],

@@ -59,4 +59,24 @@ describe("createOperatorAccess", () => {
     expect(can("node.k8s.io", "runtimeclasses")).toBe(true);
     expect(can("scheduling.k8s.io", "priorityclasses")).toBe(true);
   });
+
+  it("can read admission policies and webhooks (checks the CI fences of ci-access)", () => {
+    const role = created.find(
+      (c) => c.name === "operator-access-cluster-read" && c.type.endsWith("ClusterRole")
+    );
+    const rules = role?.inputs.rules as Rule[];
+    const can = (resource: string) =>
+      rules.some(
+        (r) =>
+          r.apiGroups.includes("admissionregistration.k8s.io") && r.resources.includes(resource)
+      );
+    for (const resource of [
+      "validatingadmissionpolicies",
+      "validatingadmissionpolicybindings",
+      "validatingwebhookconfigurations",
+      "mutatingwebhookconfigurations",
+    ]) {
+      expect(can(resource)).toBe(true);
+    }
+  });
 });
