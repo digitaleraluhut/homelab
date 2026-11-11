@@ -13,10 +13,15 @@ export const CI_SUBJECT = { kind: "ServiceAccount", name: "homelab-apps", namesp
 
 /**
  * Creates an app's namespace (pod-security restricted, owned by the CI) and grants the CI
- * its deployer rights there. Make the app's other resources depend on `binding`.
+ * its deployer rights there.
+ *
+ * Use the returned `namespace` for everything else the app creates (e.g. ExposedWebApp's
+ * `namespace`, `dependsOn: [namespace]`). It is a reference that resolves only after the
+ * RoleBinding exists, so no resource is sent to the cluster before the CI may create it.
+ * (`dependsOn` on a component does not reach its children; a data dependency does.)
  */
 export function createAppNamespace(name: string, opts?: pulumi.CustomResourceOptions) {
-  const namespace = new k8s.core.v1.Namespace(
+  const created = new k8s.core.v1.Namespace(
     `${name}-ns`,
     {
       metadata: {
@@ -39,7 +44,11 @@ export function createAppNamespace(name: string, opts?: pulumi.CustomResourceOpt
       roleRef: { apiGroup: "rbac.authorization.k8s.io", kind: "ClusterRole", name: DEPLOYER_ROLE },
       subjects: [CI_SUBJECT],
     },
-    { ...opts, dependsOn: [namespace] }
+    { ...opts, dependsOn: [created] }
   );
+  const namespace = k8s.core.v1.Namespace.get(`${name}-ns-ready`, binding.metadata.namespace, {
+    ...opts,
+    dependsOn: [binding],
+  });
   return { namespace, binding };
 }
