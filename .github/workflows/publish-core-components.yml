@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "packages/core/components/**"
+      - ".github/workflows/publish-core-components.yml"
+  # Manual re-run, e.g. after a failed publish (the version is computed from npm, so it is idempotent).
+  workflow_dispatch:
 
 jobs:
   publish:
