@@ -25,56 +25,70 @@ beforeAll(() => {
 async function load() {
   const mod = await import("./index");
   return mod.createCiAccess({
-    appNamespaces: ["app-a", "app-b", "app-new"],
-    existingNamespaces: ["app-a", "app-b"],
     apiServer: "https://ci.example:6443",
   });
 }
 
+type Rule = { apiGroups: string[]; resources: string[]; verbs: string[]; resourceNames?: string[] };
+const clusterRole = (name: string) =>
+  created.find(
+    (c) => c.name === name && c.type === "kubernetes:rbac.authorization.k8s.io/v1:ClusterRole"
+  );
+const policies = () =>
+  created.filter(
+    (c) => c.type === "kubernetes:admissionregistration.k8s.io/v1:ValidatingAdmissionPolicy"
+  );
+
 describe("createCiAccess", () => {
-  it("binds the deployer role only in the app namespaces", async () => {
+  it("creates no app namespaces and no per-app bindings (apps create their own)", async () => {
     await load();
     await new Promise((r) => setTimeout(r, 50));
+    const nss = created.filter((c) => c.type === "kubernetes:core/v1:Namespace");
+    expect(nss.map((c) => (c.inputs.metadata as { name: string }).name)).toEqual(["ci-access"]);
+    expect(created.some((c) => c.name.startsWith("ci-homelab-apps-deployer-"))).toBe(false);
+  });
+
+  it("lets CI manage namespaces and rolebindings, and bind only the deployer role", () => {
+    const rules = clusterRole("ci-homelab-apps-namespaces")?.inputs.rules as Rule[];
+    const bind = rules.filter((r) => r.verbs.includes("bind"));
+    expect(bind).toHaveLength(1);
+    expect(bind[0]?.resources).toEqual(["clusterroles"]);
+    expect(bind[0]?.resourceNames).toEqual(["ci-access:homelab-apps:deployer"]);
+    expect(
+      rules.some((r) => r.resources.includes("namespaces") && r.verbs.includes("create"))
+    ).toBe(true);
+    expect(
+      rules.some((r) => r.resources.includes("rolebindings") && r.verbs.includes("create"))
+    ).toBe(true);
+  });
+
+  it("fences CI namespaces: own label and pod-security restricted, never foreign ones", () => {
+    const ns = policies().find((p) => JSON.stringify(p.inputs).includes('"namespaces"'));
+    const text = JSON.stringify(ns?.inputs);
+    expect(text).toContain("system:serviceaccount:ci-access:homelab-apps");
+    expect(text).toContain("homelab/deployer");
+    expect(text).toContain("restricted");
+    expect(text).toContain("oldObject");
+  });
+
+  it("fences CI rolebindings to its own namespaces", () => {
+    const rb = policies().find((p) => JSON.stringify(p.inputs).includes('"rolebindings"'));
+    const text = JSON.stringify(rb?.inputs);
+    expect(text).toContain("namespaceObject");
+    expect(text).toContain("homelab/deployer");
+  });
+
+  it("enforces both policies (Deny)", () => {
     const bindings = created.filter(
       (c) =>
-        c.type === "kubernetes:rbac.authorization.k8s.io/v1:RoleBinding" &&
-        c.name.startsWith("ci-homelab-apps-deployer-")
+        c.type === "kubernetes:admissionregistration.k8s.io/v1:ValidatingAdmissionPolicyBinding"
     );
-    expect(
-      bindings.map((b) => (b.inputs.metadata as { namespace: string }).namespace).sort()
-    ).toEqual(["app-a", "app-b", "app-new"]);
-  });
-
-  it("creates only namespaces that do not exist yet", () => {
-    const nss = created
-      .filter((c) => c.type === "kubernetes:core/v1:Namespace")
-      .map((c) => (c.inputs.metadata as { name: string }).name)
-      .sort();
-    expect(nss).toEqual(["app-new", "ci-access"]);
-  });
-
-  it("labels namespaces it creates as pod-security restricted", () => {
-    const ns = created.find(
-      (c) =>
-        c.type === "kubernetes:core/v1:Namespace" &&
-        (c.inputs.metadata as { name: string }).name === "app-new"
-    );
-    const labels = (ns?.inputs.metadata as { labels: Record<string, string> }).labels;
-    for (const mode of ["enforce", "audit", "warn"]) {
-      expect(labels[`pod-security.kubernetes.io/${mode}`]).toBe("restricted");
+    expect(bindings).toHaveLength(2);
+    for (const b of bindings) {
+      expect((b.inputs.spec as { validationActions: string[] }).validationActions).toEqual([
+        "Deny",
+      ]);
     }
-  });
-
-  it("limits namespace update/patch/delete to the app namespaces", () => {
-    const role = created.find(
-      (c) => c.name === "ci-homelab-apps-namespaces" && c.type.endsWith("ClusterRole")
-    );
-    const rules = role?.inputs.rules as { verbs: string[]; resourceNames?: string[] }[];
-    const destructive = rules.filter((r) =>
-      r.verbs.some((v) => ["update", "patch", "delete"].includes(v))
-    );
-    expect(destructive).toHaveLength(1);
-    expect(destructive[0]?.resourceNames).toEqual(["app-a", "app-b", "app-new"]);
   });
 
   it("grants no exec, port-forward or cluster-scoped writes in the deployer role", () => {

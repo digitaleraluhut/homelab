@@ -1,3 +1,9 @@
+import {
+  APP_NAMESPACE_LABEL,
+  APP_NAMESPACE_OWNER,
+  CI_SUBJECT,
+  DEPLOYER_ROLE,
+} from "@mrsimpson/homelab-core-components";
 import * as k8s from "@pulumi/kubernetes";
 import * as pulumi from "@pulumi/pulumi";
 
@@ -10,30 +16,27 @@ import * as pulumi from "@pulumi/pulumi";
  * deployments etc. cluster-wide and namespace deletion for every namespace.
  *
  * Scope:
- * - Full namespaced rights (incl. secrets and Roles) only inside the app namespaces.
- * - Namespaces: create any, but update/patch/delete only the app namespaces.
+ * - Each app creates its own namespace and binds the deployer role to this ServiceAccount there
+ *   (homelab-core-components: createAppNamespace). Adding an app needs no change here.
+ * - Admission policies fence that: namespaces the CI creates or changes must carry
+ *   `homelab/deployer: homelab-apps` and pod-security `restricted`; it cannot change or delete
+ *   any other namespace, and creates RoleBindings only in its own namespaces.
  * - observability: the opencode dashboard ConfigMap + its sync Job.
- * - No cluster-scoped writes otherwise, no pods/exec or port-forward anywhere.
- *
- * Adding an app: add its namespace to `appNamespaces` (reviewed via CODEOWNERS),
- * deploy homelab, then deploy the app. RoleBindings need the namespace to exist,
- * so a new app's namespace is created here and the app must not create it itself.
+ * - No other cluster-scoped writes, no pods/exec or port-forward anywhere.
  *
  * Get the kubeconfig for the GitHub environment secret:
  *   pulumi stack output ciAppsKubeconfig --show-secrets | base64 | tr -d '\n'
  */
 
 export interface CiAccessArgs {
-  /** Namespaces the homelab-apps CI may deploy into. */
-  appNamespaces: string[];
-  /** Namespaces that already exist (created by the app stacks themselves). */
-  existingNamespaces: string[];
   /** API server URL reachable from CI runners (Tailscale address of the node). */
   apiServer: string;
 }
 
-const NAMESPACE = "ci-access";
-const SA_NAME = "homelab-apps";
+const NAMESPACE = CI_SUBJECT.namespace;
+const SA_NAME = CI_SUBJECT.name;
+const SA_USER = `system:serviceaccount:${NAMESPACE}:${SA_NAME}`;
+
 const ALL = ["get", "list", "watch", "create", "update", "patch", "delete"];
 const LABELS = {
   "app.kubernetes.io/managed-by": "pulumi-homelab",
@@ -81,8 +84,6 @@ const appDeployerRules: k8s.types.input.rbac.v1.PolicyRule[] = [
 ];
 
 export function createCiAccess(args: CiAccessArgs) {
-  const missing = args.appNamespaces.filter((n) => !args.existingNamespaces.includes(n));
-
   const ns = new k8s.core.v1.Namespace("ci-access-ns", {
     metadata: {
       name: NAMESPACE,
@@ -90,72 +91,103 @@ export function createCiAccess(args: CiAccessArgs) {
     },
   });
 
-  // Namespaces of new apps are owned here, so RoleBindings can be created before
-  // the first app deploy.
-  const createdNamespaces = missing.map(
-    (name) =>
-      new k8s.core.v1.Namespace(`ci-app-ns-${name}`, {
-        metadata: {
-          name,
-          labels: {
-            ...LABELS,
-            "pod-security.kubernetes.io/enforce": "restricted",
-            "pod-security.kubernetes.io/audit": "restricted",
-            "pod-security.kubernetes.io/warn": "restricted",
-          },
-        },
-      })
-  );
-
   const sa = new k8s.core.v1.ServiceAccount("ci-homelab-apps-sa", {
     metadata: { name: SA_NAME, namespace: ns.metadata.name, labels: LABELS },
   });
-  const subject = { kind: "ServiceAccount", name: SA_NAME, namespace: NAMESPACE };
+  const subject = CI_SUBJECT;
+
+  const deployerRole = new k8s.rbac.v1.ClusterRole("ci-homelab-apps-deployer", {
+    metadata: { name: DEPLOYER_ROLE, labels: LABELS },
+    rules: appDeployerRules,
+  });
+
+  // The fences come first: the rights below are only safe with the policies in force.
+  const owned = `has(%s.metadata.labels) && '${APP_NAMESPACE_LABEL}' in %s.metadata.labels && %s.metadata.labels['${APP_NAMESPACE_LABEL}'] == '${APP_NAMESPACE_OWNER}'`;
+  const isOwned = (o: string) => owned.split("%s").join(o);
+  const fences = [
+    {
+      name: "ci-homelab-apps-namespaces",
+      resources: [{ apiGroups: [""], apiVersions: ["v1"], resources: ["namespaces"] }],
+      validations: [
+        {
+          expression: `request.operation == 'DELETE' || (${isOwned("object")} && 'pod-security.kubernetes.io/enforce' in object.metadata.labels && object.metadata.labels['pod-security.kubernetes.io/enforce'] == 'restricted' && (!('pod-security.kubernetes.io/enforce-version' in object.metadata.labels) || object.metadata.labels['pod-security.kubernetes.io/enforce-version'] == 'latest'))`,
+          message: `CI namespaces need ${APP_NAMESPACE_LABEL}=${APP_NAMESPACE_OWNER} and pod-security enforce=restricted (latest)`,
+        },
+        {
+          expression: `request.operation == 'CREATE' || (${isOwned("oldObject")})`,
+          message: "CI may only change or delete namespaces it owns",
+        },
+      ],
+    },
+    {
+      name: "ci-homelab-apps-rolebindings",
+      resources: [
+        {
+          apiGroups: ["rbac.authorization.k8s.io"],
+          apiVersions: ["v1"],
+          resources: ["rolebindings"],
+        },
+      ],
+      validations: [
+        {
+          expression: isOwned("namespaceObject"),
+          message: "CI may only manage RoleBindings in namespaces it owns",
+        },
+      ],
+    },
+  ];
+  const fenceBindings = fences.map((f) => {
+    const policy = new k8s.admissionregistration.v1.ValidatingAdmissionPolicy(f.name, {
+      metadata: {
+        name: f.name.replace("ci-homelab-apps-", "ci-access.homelab-apps."),
+        labels: LABELS,
+      },
+      spec: {
+        failurePolicy: "Fail",
+        matchConstraints: {
+          resourceRules: f.resources.map((r) => ({
+            ...r,
+            operations: ["CREATE", "UPDATE", "DELETE"],
+          })),
+        },
+        matchConditions: [
+          { name: "homelab-apps-ci", expression: `request.userInfo.username == '${SA_USER}'` },
+        ],
+        validations: f.validations,
+      },
+    });
+    return new k8s.admissionregistration.v1.ValidatingAdmissionPolicyBinding(f.name, {
+      metadata: { name: policy.metadata.name, labels: LABELS },
+      spec: { policyName: policy.metadata.name, validationActions: ["Deny"] },
+    });
+  });
 
   const nsRole = new k8s.rbac.v1.ClusterRole("ci-homelab-apps-namespaces", {
     metadata: { name: "ci-access:homelab-apps:namespaces", labels: LABELS },
     rules: [
-      // `create` cannot be limited by name; new namespaces carry no rights for CI.
-      { apiGroups: [""], resources: ["namespaces"], verbs: ["get", "list", "watch", "create"] },
+      { apiGroups: [""], resources: ["namespaces"], verbs: ALL },
+      { apiGroups: ["rbac.authorization.k8s.io"], resources: ["rolebindings"], verbs: ALL },
       {
-        apiGroups: [""],
-        resources: ["namespaces"],
-        resourceNames: args.appNamespaces,
-        verbs: ["update", "patch", "delete"],
+        apiGroups: ["rbac.authorization.k8s.io"],
+        resources: ["clusterroles"],
+        resourceNames: [DEPLOYER_ROLE],
+        verbs: ["bind"],
       },
     ],
   });
-  new k8s.rbac.v1.ClusterRoleBinding("ci-homelab-apps-namespaces", {
-    metadata: { name: "ci-access:homelab-apps:namespaces", labels: LABELS },
-    roleRef: {
-      apiGroup: "rbac.authorization.k8s.io",
-      kind: "ClusterRole",
-      name: nsRole.metadata.name,
-    },
-    subjects: [subject],
-  });
-
-  const deployerRole = new k8s.rbac.v1.ClusterRole("ci-homelab-apps-deployer", {
-    metadata: { name: "ci-access:homelab-apps:deployer", labels: LABELS },
-    rules: appDeployerRules,
-  });
-
-  for (const name of args.appNamespaces) {
-    new k8s.rbac.v1.RoleBinding(
-      `ci-homelab-apps-deployer-${name}`,
-      {
-        metadata: { name: "ci-access:homelab-apps:deployer", namespace: name, labels: LABELS },
-        // ClusterRole bound via RoleBinding: the rules apply only in this namespace.
-        roleRef: {
-          apiGroup: "rbac.authorization.k8s.io",
-          kind: "ClusterRole",
-          name: deployerRole.metadata.name,
-        },
-        subjects: [subject],
+  new k8s.rbac.v1.ClusterRoleBinding(
+    "ci-homelab-apps-namespaces",
+    {
+      metadata: { name: "ci-access:homelab-apps:namespaces", labels: LABELS },
+      roleRef: {
+        apiGroup: "rbac.authorization.k8s.io",
+        kind: "ClusterRole",
+        name: nsRole.metadata.name,
       },
-      { dependsOn: createdNamespaces }
-    );
-  }
+      subjects: [subject],
+    },
+    { dependsOn: [...fenceBindings, deployerRole] }
+  );
 
   // apps/opencode-router writes a Grafana dashboard ConfigMap and a sync Job into
   // observability. Job names are timestamped, so only the ConfigMap is name-limited.

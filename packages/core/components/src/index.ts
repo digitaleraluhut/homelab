@@ -5,6 +5,13 @@
  */
 
 export { ExposedWebApp, AuthType } from "./ExposedWebApp";
+export {
+  APP_NAMESPACE_LABEL,
+  APP_NAMESPACE_OWNER,
+  CI_SUBJECT,
+  createAppNamespace,
+  DEPLOYER_ROLE,
+} from "./app-namespace";
 export { HomelabContext } from "./homelab-context";
 export { createHomelabContextFromStack } from "./createHomelabContextFromStack";
 export type { HomelabContextFromStackOptions } from "./createHomelabContextFromStack";
