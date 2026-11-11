@@ -1,0 +1,39 @@
+---
+# Node.js for the operator: pinned version, verified checksum, root-owned, so
+# the operator can use it but not change it.
+
+- name: Create the Node.js directory
+  ansible.builtin.file:
+    path: "{{ aioperator_node_dir }}"
+    state: directory
+    owner: "{{ aioperator_node_owner }}"
+    group: "{{ aioperator_node_owner }}"
+    mode: "0755"
+
+- name: Download Node.js (pinned version, verified checksum)
+  ansible.builtin.get_url:
+    url: "{{ aioperator_node_url }}"
+    dest: "{{ aioperator_node_dir }}.tar.xz"
+    checksum: "sha256:{{ aioperator_node_sha256 }}"
+    owner: "{{ aioperator_node_owner }}"
+    group: "{{ aioperator_node_owner }}"
+    mode: "0644"
+
+- name: Unpack Node.js
+  ansible.builtin.unarchive:
+    src: "{{ aioperator_node_dir }}.tar.xz"
+    dest: "{{ aioperator_node_dir }}"
+    remote_src: true
+    extra_opts: [--strip-components=1]
+    owner: "{{ aioperator_node_owner }}"
+    group: "{{ aioperator_node_owner }}"
+    creates: "{{ aioperator_node_dir }}/bin/node"
+
+- name: Put node, npm and npx on the operator's PATH
+  ansible.builtin.file:
+    src: "{{ aioperator_node_dir }}/bin/{{ item }}"
+    dest: "{{ aioperator_node_link_dir }}/{{ item }}"
+    state: link
+    force: true
+    follow: false
+  loop: [node, npm, npx]

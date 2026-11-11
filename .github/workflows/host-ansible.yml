@@ -59,3 +59,6 @@ jobs:
 
       - name: Workspace instructions (AGENTS.md)
         run: ansible-playbook tests/workspace-agents.yml -e out="$RUNNER_TEMP/workspace-agents"
+
+      - name: Node.js for the operator
+        run: ansible-playbook tests/node.yml -e out="$RUNNER_TEMP/node"
