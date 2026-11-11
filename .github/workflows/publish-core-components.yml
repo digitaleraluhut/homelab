@@ -12,6 +12,8 @@ jobs:
     environment: production
     permissions:
       contents: read
+      # npm trusted publishing (OIDC): npm trusts this workflow + environment, no NPM_TOKEN secret.
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -45,8 +47,11 @@ jobs:
           echo "Publishing $NAME@$VERSION (npm had $PUBLISHED)"
           npm version "$VERSION" --no-git-tag-version --allow-same-version
 
+      # Trusted publishing needs npm >= 11.5.1 (Node 24 ships it); provenance is attached automatically.
       - name: Publish
-        run: npm publish
         working-directory: packages/core/components
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm -v
+          node -e 'const [a,b,c]=process.argv[1].split(".").map(Number); process.exit(a>11||(a==11&&(b>5||(b==5&&c>=1)))?0:1)' "$(npm -v)" \
+            || { echo "npm $(npm -v) is too old for trusted publishing"; exit 1; }
+          npm publish
