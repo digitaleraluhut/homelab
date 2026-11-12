@@ -49,4 +49,8 @@ walle_cpu_quota: 200%
 # The service and the review trigger are installed but off until switched on
 # here. While off, the operator may still start a single run by hand.
 walle_enabled: false
-walle_review_enabled: false
+# The review trigger is on: for now bin/review-pending only moves a request to
+# outbox/reviewing/ and logs it for the operator (notify mode); the operator
+# reviews by hand (training stage 1).
+walle_review_enabled: true
+walle_review_mode: notify   # notify | review (headless Claude Code)

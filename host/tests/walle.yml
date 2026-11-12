@@ -29,6 +29,7 @@
         - {src: ../roles/walle/templates/walle-review.service.j2, dest: walle-review.service}
         - {src: ../roles/walle/templates/walle-review.path.j2, dest: walle-review.path}
         - {src: ../roles/walle/templates/walle-mirrors.service.j2, dest: walle-mirrors.service}
+        - {src: ../roles/walle/templates/walle-status.sh.j2, dest: walle-status.sh}
         - {src: ../roles/walle/templates/walle-gitconfig.j2, dest: walle.gitconfig}
         - {src: ../roles/aioperator/templates/gitconfig.j2, dest: operator.gitconfig}
 
@@ -52,7 +53,8 @@
           # It may write only its work and outbox; its code and the answers are read-only.
           - "'ReadWritePaths=/srv/walle/work /srv/walle/outbox' in files['walle.service']"
           - "'ReadOnlyPaths=/srv/walle/app /srv/walle/repos /srv/walle/inbox' in files['walle.service']"
-          # The review job runs as the operator.
+          # The review job runs as the operator, in notify mode by default.
+          - "'WALLE_REVIEW_MODE=notify' in files['walle-review.service']"
           - "'User=aioperator' in files['walle-review.service']"
           # The mirrors are updated by the operator, never by WALL-E.
           - "'User=aioperator' in files['walle-mirrors.service']"
@@ -61,3 +63,12 @@
           - "'directory = /srv/walle/repos/homelab' in files['walle.gitconfig']"
           - "'credential' not in files['walle.gitconfig']"
         fail_msg: a fence of the walle role is missing
+
+    - name: The status script prints nothing and exits 0 without access to the tree
+      ansible.builtin.command:
+        cmd: sh {{ out }}/walle-status.sh
+      environment:
+        PATH: /usr/bin:/bin
+      register: status
+      changed_when: false
+      failed_when: status.rc != 0 or (status.stdout != "" and "WALL-E" not in status.stdout)
