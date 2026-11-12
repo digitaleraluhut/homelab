@@ -85,7 +85,7 @@ aioperator_claude_allow:
 #   app.env          root:root 0644  APP_ID=, INSTALLATION_ID=, BOT_LOGIN=, BOT_USER_ID=
 # Until app.env exists, git and gh keep using the previous gh login.
 aioperator_github_app_dir: /etc/homelab/operator-github-app
-aioperator_github_repositories: [homelab, homelab-apps, local-ai, homelab-wiki]
+aioperator_github_repositories: [homelab, homelab-apps, local-ai, homelab-wiki, walle]
 # Requested per token; never more than the App installation grants.
 # Deliberately no "workflows": GitHub then refuses any push that adds or
 # changes .github/workflows/, even on branches, so only reviewed workflow
