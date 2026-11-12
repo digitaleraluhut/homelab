@@ -28,6 +28,7 @@ group).
 |---|---|
 | `runner` | ansible-core, git, the runner script, service and timer |
 | `aioperator` | user `aioperator`, its sudo whitelist (validated with `visudo`), `claude-remote.service`, workspace instructions (`AGENTS.md`, `CLAUDE.md` link), agent skills (skills-coding checkout linked; this repo's `skills/` copied from main), Claude Code managed settings `/etc/claude-code/managed-settings.json` (operator permissions), GitHub access via an org GitHub App (token helper, `gh` wrapper, `~/.gitconfig`) |
+| `k3s-kubectl` | `/etc/profile.d/k3s-kubectl.sh`: `K3S_CONFIG_FILE=/dev/null` for non-root users, so `kubectl` (the k3s binary) stops warning about the root-only `/etc/rancher/k3s/config.yaml` |
 | `localai` | model sync (`localai-model-sync`, catalog `models/catalog.yaml` of local-ai: downloads missing files, verifies sha256, never deletes; after each ref change and daily), system user `localai` (home `/srv/localai`, GPU groups, subuid range, linger), pinned `local-ai` checkout, presets synced to `~/.config/llama-cpp`, unit templates and drop-ins, service instances, lab slot `llama-server@lab` (preset `lab/lab.ini`, port 8095, not started by default) |
 | `timeshift` | excludes in `/etc/timeshift/timeshift.json` for data that is only pulled (models, container images, caches, git checkouts, the operator home). Snapshots land on the same disk; adds missing entries only, the owner's own entries and settings stay |
 

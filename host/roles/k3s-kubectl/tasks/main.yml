@@ -1,0 +1,8 @@
+---
+- name: Silence the k3s server-config warning of kubectl for non-root users
+  ansible.builtin.copy:
+    src: k3s-kubectl.sh
+    dest: /etc/profile.d/k3s-kubectl.sh
+    owner: root
+    group: root
+    mode: "0644"
