@@ -30,6 +30,7 @@
         - {src: ../roles/walle/templates/walle-review.path.j2, dest: walle-review.path}
         - {src: ../roles/walle/templates/walle-mirrors.service.j2, dest: walle-mirrors.service}
         - {src: ../roles/walle/templates/walle-status.sh.j2, dest: walle-status.sh}
+        - {src: ../roles/walle/templates/walle-fetch.service.j2, dest: walle-fetch.service}
         - {src: ../roles/walle/templates/walle-gitconfig.j2, dest: walle.gitconfig}
         - {src: ../roles/aioperator/templates/gitconfig.j2, dest: operator.gitconfig}
 
@@ -37,7 +38,7 @@
       ansible.builtin.slurp:
         src: "{{ out }}/{{ item }}"
       register: rendered
-      loop: [walle.service, walle-review.service, walle-mirrors.service, operator.gitconfig, walle.gitconfig]
+      loop: [walle.service, walle-review.service, walle-mirrors.service, walle-fetch.service, operator.gitconfig, walle.gitconfig]
 
     - name: Check the fences
       vars:
@@ -58,6 +59,9 @@
           - "'User=aioperator' in files['walle-review.service']"
           # The mirrors are updated by the operator, never by WALL-E.
           - "'User=aioperator' in files['walle-mirrors.service']"
+          # The web proxy reaches no internal network.
+          - "'IPAddressDeny=10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10' in files['walle-fetch.service']"
+          - "'DynamicUser=true' in files['walle-fetch.service']"
           # Each side trusts the other's repositories, and only those.
           - "'directory = /srv/walle/work/homelab' in files['operator.gitconfig']"
           - "'directory = /srv/walle/repos/homelab' in files['walle.gitconfig']"
@@ -72,3 +76,8 @@
       register: status
       changed_when: false
       failed_when: status.rc != 0 or (status.stdout != "" and "WALL-E" not in status.stdout)
+
+    - name: The web proxy's URL checks pass their unit tests
+      ansible.builtin.command:
+        cmd: python3 {{ playbook_dir }}/../roles/walle/files/test_walle_fetch.py
+      changed_when: false
