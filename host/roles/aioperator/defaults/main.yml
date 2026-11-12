@@ -66,7 +66,7 @@ aioperator_skills:
   commit-intents: "{{ aioperator_skills_coding_dir }}/commit-intents"
 # Skills from this repository (skills/<name>), copied from the reviewed main
 # that the runner applies. They do not depend on the operator's checkouts.
-aioperator_repo_skills: [wiki-maintenance, workflow-handoff]
+aioperator_repo_skills: [wiki-maintenance, workflow-handoff, train-walle]
 aioperator_repo_skills_src: "{{ playbook_dir }}/../skills"
 aioperator_skill_dirs:
   - "{{ aioperator_home }}/.agents/skills"
