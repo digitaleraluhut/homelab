@@ -1,6 +1,11 @@
 import * as k8s from "@pulumi/kubernetes";
 import * as pulumi from "@pulumi/pulumi";
-import { backupTargetRoot, getBackupCredentials, hasBackupCredentials } from "./r2-buckets";
+import {
+  backupTargetRoot,
+  getBackupCredentials,
+  hasBackupCredentials,
+  r2Endpoint,
+} from "./r2-buckets";
 
 /**
  * Longhorn Backup Configuration
@@ -28,7 +33,8 @@ export interface BackupConfig {
  */
 export function getBackupConfig(): BackupConfig {
   const accountId = config.require("cloudflareAccountId");
-  const s3Endpoint = `https://${accountId}.r2.cloudflarestorage.com`;
+  // The bucket is in the EU jurisdiction: only the ".eu." endpoint serves it.
+  const s3Endpoint = r2Endpoint;
 
   const hasCredentials = hasBackupCredentials();
   let creds = {
