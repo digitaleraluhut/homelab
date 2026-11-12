@@ -2,16 +2,15 @@
  * @mrsimpson/homelab-aftertouch
  *
  * AfterTouch: local cloud replacement for Bose SoundTouch speakers. A privileged workload
- * (hostNetwork for SSDP/mDNS discovery, NodePorts on the LAN), so it lives in the
- * owner-reviewed homelab stack and not in homelab-apps, whose CI may only create
- * pod-security "restricted" namespaces.
+ * (hostPorts on the LAN), so it lives in the owner-reviewed homelab stack and not in
+ * homelab-apps, whose CI may only create pod-security "restricted" namespaces.
  *
  * Moved from homelab-apps (apps/aftertouch, stack mrsimpson/aftertouch/dev) on 2026-11-11.
  * Resource names are unchanged, so `pulumi state move` carries the existing resources
  * (including the data volume) over without replacing them.
  *
  * Config (homelab stack, prefix "aftertouch:"): nodeIp, nodeName, mgmtUsername (secret),
- * mgmtPassword (secret); optional preferredDevices, appHostname. The image versions are pinned
+ * mgmtPassword (secret); optional discoverySubnets (LAN CIDRs, comma-separated), appHostname. The image versions are pinned
  * here, not in config, so an update is a reviewed diff.
  */
 
@@ -31,6 +30,8 @@ const NAMESPACE = APP_NAME;
 const APP_PORT = 8000; // HTTP web UI + speaker API (AfterTouch backend)
 const HTTPS_PORT = 8443; // HTTPS for speaker DNS redirect method
 const WEB_PORT = 9090; // soundtouch-web UI (sidecar) — 8080 taken by llama.cpp on host
+// The image's unprivileged user (it defaults to root, but ships this user for non-root use).
+const APP_UID = 65532;
 
 // LAN access: Fritz.Box DNS entry required → <appHostname> → <nodeIp>
 // NodePort services expose the app directly on the node for local network access.
@@ -47,7 +48,7 @@ export function setupAftertouch() {
   const cfg = new pulumi.Config("aftertouch");
   const mgmtUsername = cfg.requireSecret("mgmtUsername");
   const mgmtPassword = cfg.requireSecret("mgmtPassword");
-  const preferredDevices = cfg.get("preferredDevices");
+  const discoverySubnets = cfg.get("discoverySubnets");
   const nodeIp = cfg.require("nodeIp");
   const nodeName = cfg.require("nodeName");
   const APP_HOSTNAME = cfg.get("appHostname") ?? `aftertouch.${nodeName}.fritz.box`;
@@ -59,7 +60,14 @@ export function setupAftertouch() {
   const ns = new k8s.core.v1.Namespace(`${APP_NAME}-ns`, {
     metadata: {
       name: NAMESPACE,
-      labels: { app: APP_NAME },
+      labels: {
+        app: APP_NAME,
+        // hostPort is refused by "baseline", so enforcement stays privileged; warn and audit
+        // report anything beyond that.
+        "pod-security.kubernetes.io/enforce": "privileged",
+        "pod-security.kubernetes.io/warn": "baseline",
+        "pod-security.kubernetes.io/audit": "baseline",
+      },
     },
   });
 
@@ -108,17 +116,24 @@ export function setupAftertouch() {
   // ---------------------------------------------------------------------------
   // 4. Deployment
   //
-  // hostNetwork: true — required so AfterTouch can:
-  //   - Send/receive SSDP multicast (239.255.255.250:1900) for UPnP speaker discovery
-  //   - Reach speakers on the LAN subnet directly (mDNS, Bose SoundTouch API)
-  // With hostNetwork the pod shares the node's network namespace, so it sees
-  // all LAN interfaces and multicast groups without a NAT boundary.
-  // The pod is pinned to the single k3s node (flinker) via nodeSelector.
+  // On the pod network, with hostPorts. The speakers were migrated to <node>:8000 and :8443;
+  // another port would mean re-migrating every speaker. A hostPort keeps those addresses and,
+  // unlike a NodePort, the speaker's source IP, which the server uses to push credentials
+  // back to the speaker. The pod is pinned to the node whose IP the speakers know.
+  //
+  // Multicast discovery (SSDP/mDNS) does not reach the LAN from here. The server finds
+  // speakers by a unicast scan (GET <ip>:8090/info) of DISCOVERY_SUBNETS instead, on
+  // "Scan Again" and hourly; without the subnets it would guess from its own pod network.
   // ---------------------------------------------------------------------------
 
   const env: k8s.types.input.core.v1.EnvVar[] = [
     { name: "BASE_URL", value: `http://${APP_HOSTNAME}` },
-    ...(preferredDevices ? [{ name: "PREFERRED_DEVICES", value: preferredDevices }] : []),
+    ...(discoverySubnets
+      ? [
+          { name: "DISCOVERY_SUBNETS", value: discoverySubnets },
+          { name: "DISCOVERY_SCAN_INTERVAL", value: "1h" },
+        ]
+      : []),
   ];
 
   const deployment = new k8s.apps.v1.Deployment(
@@ -131,29 +146,40 @@ export function setupAftertouch() {
       },
       spec: {
         replicas: 1,
-        // Recreate (not RollingUpdate) is required because hostNetwork: true means the pod
-        // binds to real host ports (8000, 8443, 8080). Two pods cannot run simultaneously
-        // on the same node with the same host ports — the old pod must terminate before
-        // the new one can start.
+        // Recreate (not RollingUpdate): two pods cannot hold the same host ports on the node,
+        // so the old pod must terminate before the new one can start.
         strategy: { type: "Recreate", rollingUpdate: undefined },
         selector: { matchLabels: { app: APP_NAME } },
         template: {
           metadata: { labels: { app: APP_NAME } },
           spec: {
-            // Required for SSDP/mDNS multicast discovery on the LAN
-            hostNetwork: true,
-            // Pin to the single node; hostNetwork pods are node-local by definition
             nodeSelector: { "kubernetes.io/hostname": nodeName },
-            // AfterTouch upstream image runs as root
-            securityContext: {},
+            // The server puts os.Hostname() into its TLS certificate and expected hosts. Under
+            // hostNetwork that was the node's name; keep it, or each new pod regenerates the cert.
+            hostname: nodeName,
+            securityContext: {
+              runAsNonRoot: true,
+              runAsUser: APP_UID,
+              runAsGroup: APP_UID,
+              // The volume was written by root; fsGroup makes it writable for APP_UID.
+              fsGroup: APP_UID,
+              fsGroupChangePolicy: "OnRootMismatch",
+              seccompProfile: { type: "RuntimeDefault" },
+            },
             containers: [
               {
                 name: "app",
                 image: APP_IMAGE,
                 ports: [
-                  { name: "http", containerPort: APP_PORT },
-                  { name: "https", containerPort: HTTPS_PORT },
+                  { name: "http", containerPort: APP_PORT, hostPort: APP_PORT },
+                  { name: "https", containerPort: HTTPS_PORT, hostPort: HTTPS_PORT },
                 ],
+                securityContext: {
+                  allowPrivilegeEscalation: false,
+                  // The binary carries the file capability cap_net_bind_service=+ep; without it
+                  // in the bounding set exec fails with EPERM.
+                  capabilities: { drop: ["ALL"], add: ["NET_BIND_SERVICE"] },
+                },
                 env,
                 envFrom: [{ secretRef: { name: `${APP_NAME}-mgmt` } }],
                 resources: {
@@ -175,14 +201,18 @@ export function setupAftertouch() {
                 },
               },
               // soundtouch-web UI sidecar — SPA frontend that talks to the AfterTouch
-              // backend on localhost:8000 (shared network namespace via hostNetwork).
+              // backend on localhost:8000 (the pod's shared network namespace).
               {
                 name: "web",
                 image: WEB_IMAGE,
                 // Default port is 8080 which is taken by llama.cpp on this host.
                 // Override via the -port flag to use 9090 instead.
                 args: ["-port", `${WEB_PORT}`],
-                ports: [{ name: "web", containerPort: WEB_PORT }],
+                ports: [{ name: "web", containerPort: WEB_PORT, hostPort: WEB_PORT }],
+                securityContext: {
+                  allowPrivilegeEscalation: false,
+                  capabilities: { drop: ["ALL"] },
+                },
                 resources: {
                   requests: { cpu: "20m", memory: "32Mi" },
                   limits: { cpu: "200m", memory: "128Mi" },
