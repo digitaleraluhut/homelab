@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+# Keeps WALL-E's read-only mirrors (and so its view of the wiki) at GitHub's main.
+# Runs as the operator, whose GitHub App token can read the private repositories.
+[Unit]
+Description=Update WALL-E's repository mirrors
+
+[Service]
+Type=oneshot
+User={{ walle_reviewer }}
+Group={{ walle_user }}
+UMask=0027
+Environment=PATH={{ walle_reviewer_home }}/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=WALLE_ROOT={{ walle_root }}
+ExecStart={{ walle_root }}/app/bin/sync-mirrors
+TimeoutStartSec=10min

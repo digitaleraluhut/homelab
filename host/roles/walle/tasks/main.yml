@@ -65,7 +65,7 @@
     owner: root
     group: root
     mode: "0644"
-  loop: [walle.service, walle-review.service, walle-review.path]
+  loop: [walle.service, walle-review.service, walle-review.path, walle-mirrors.service, walle-mirrors.timer]
   notify: Reload systemd
 
 - name: Flush handlers before switching units
@@ -84,3 +84,10 @@
     name: walle-review.path
     enabled: "{{ walle_review_enabled }}"
     state: "{{ 'started' if walle_review_enabled else 'stopped' }}"
+
+# Unlike the service, the mirrors are harmless to keep current: always on.
+- name: Keep the mirrors current
+  ansible.builtin.systemd_service:
+    name: walle-mirrors.timer
+    enabled: true
+    state: started
