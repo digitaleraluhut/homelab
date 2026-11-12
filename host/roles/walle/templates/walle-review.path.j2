@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+# Starts the operator's review job when WALL-E files a review request.
+[Unit]
+Description=WALL-E review requests waiting for the operator
+
+[Path]
+DirectoryNotEmpty={{ walle_root }}/outbox/pending
+Unit=walle-review.service
+
+[Install]
+WantedBy=paths.target

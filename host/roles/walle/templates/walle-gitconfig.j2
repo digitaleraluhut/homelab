@@ -1,0 +1,9 @@
+# {{ ansible_managed }}
+[user]
+	name = WALL-E (apprentice)
+	email = walle@localhost
+[safe]
+{% for repo in walle_repositories %}
+	directory = {{ walle_root }}/repos/{{ repo }}
+	directory = {{ walle_root }}/repos/{{ repo }}/.git
+{% endfor %}

@@ -8,3 +8,11 @@
 [credential "https://gist.github.com"]
 	helper =
 	helper = {{ aioperator_git_credential_helper }}
+{% if walle_root is defined %}
+# WALL-E's clones, which the operator reviews (owned by user walle).
+[safe]
+{% for repo in walle_repositories %}
+	directory = {{ walle_root }}/work/{{ repo }}
+	directory = {{ walle_root }}/work/{{ repo }}/.git
+{% endfor %}
+{% endif %}

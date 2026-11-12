@@ -13,5 +13,7 @@
       tags: [k3s_kubectl]
     - role: aioperator
       tags: [aioperator]
+    - role: walle
+      tags: [walle]
     - role: timeshift
       tags: [timeshift]

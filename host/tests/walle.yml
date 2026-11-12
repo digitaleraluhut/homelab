@@ -1,0 +1,54 @@
+---
+# Renders WALL-E's units and both git configs into a scratch directory and
+# checks the fences that matter. Run: ansible-playbook tests/walle.yml -e out=$(mktemp -d)
+- name: Render and check the walle role
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../roles/aioperator/defaults/main.yml
+    - ../roles/walle/defaults/main.yml
+  vars:
+    aioperator_git_name: operator
+    aioperator_git_email: operator@localhost
+    aioperator_git_credential_helper: /usr/local/bin/operator-github-token
+  tasks:
+    - name: Render the templates
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ out }}/{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - {src: ../roles/walle/templates/walle.service.j2, dest: walle.service}
+        - {src: ../roles/walle/templates/walle-review.service.j2, dest: walle-review.service}
+        - {src: ../roles/walle/templates/walle-review.path.j2, dest: walle-review.path}
+        - {src: ../roles/walle/templates/walle-gitconfig.j2, dest: walle.gitconfig}
+        - {src: ../roles/aioperator/templates/gitconfig.j2, dest: operator.gitconfig}
+
+    - name: Read the rendered files
+      ansible.builtin.slurp:
+        src: "{{ out }}/{{ item }}"
+      register: rendered
+      loop: [walle.service, walle-review.service, operator.gitconfig, walle.gitconfig]
+
+    - name: Check the fences
+      vars:
+        files: "{{ dict(rendered.results | map(attribute='item') | zip(rendered.results | map(attribute='content') | map('b64decode'))) }}"
+      ansible.builtin.assert:
+        that:
+          # WALL-E runs as itself, without privileges, and reaches only localhost.
+          - "'User=walle' in files['walle.service']"
+          - "'NoNewPrivileges=true' in files['walle.service']"
+          - "'IPAddressDeny=any' in files['walle.service']"
+          - "'IPAddressAllow=localhost' in files['walle.service']"
+          - "'ProtectSystem=strict' in files['walle.service']"
+          # It may write only its work and outbox; its code and the answers are read-only.
+          - "'ReadWritePaths=/srv/walle/work /srv/walle/outbox' in files['walle.service']"
+          - "'ReadOnlyPaths=/srv/walle/app /srv/walle/repos /srv/walle/inbox' in files['walle.service']"
+          # The review job runs as the operator.
+          - "'User=aioperator' in files['walle-review.service']"
+          # Each side trusts the other's repositories, and only those.
+          - "'directory = /srv/walle/work/homelab' in files['operator.gitconfig']"
+          - "'directory = /srv/walle/repos/homelab' in files['walle.gitconfig']"
+          - "'credential' not in files['walle.gitconfig']"
+        fail_msg: a fence of the walle role is missing

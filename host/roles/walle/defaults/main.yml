@@ -1,0 +1,52 @@
+---
+# WALL-E: an apprentice agent (local model, pi harness) that monitors and tidies
+# the homelab. It has no GitHub access and no network beyond localhost: it works
+# in its own clones, and every change goes to the operator as a review request.
+# The operator reviews, pushes and opens the PR under its own name.
+
+walle_user: walle
+walle_home: /var/lib/walle            # also the service's StateDirectory
+walle_root: /srv/walle
+
+# The operator reads WALL-E's work and answers its requests (group walle).
+walle_reviewer: "{{ aioperator_user }}"
+walle_reviewer_home: "{{ aioperator_home }}"
+
+# Directory -> owner, mode. Group is always walle; setgid keeps it on new files.
+#   app     the host program, instructions and skills (deployed by the operator
+#           from digitaleraluhut/walle); WALL-E can read but not change itself
+#   repos   mirrors of the repositories, kept current by the operator
+#   inbox   the operator's answers; WALL-E can read but never approve itself
+#   work    WALL-E's clones and worktrees
+#   outbox  WALL-E's review requests (pending/, then moved by the review job)
+walle_dirs:
+  app: {owner: "{{ aioperator_user }}", mode: "2750"}
+  repos: {owner: "{{ aioperator_user }}", mode: "2750"}
+  inbox: {owner: "{{ aioperator_user }}", mode: "2750"}
+  work: {owner: "{{ walle_user }}", mode: "2750"}
+  outbox: {owner: "{{ walle_user }}", mode: "2770"}
+  outbox/pending: {owner: "{{ walle_user }}", mode: "2770"}
+
+walle_repositories: [homelab, homelab-apps, local-ai, homelab-wiki]
+
+# Read-only cluster access (Pulumi output walleKubeconfig of the homelab stack).
+# Placed by the owner, like the operator's kubeconfig:
+#   pulumi stack output walleKubeconfig --show-secrets \
+#     | sudo install -D -m 640 -o root -g walle /dev/stdin /etc/homelab/walle/kubeconfig
+walle_kubeconfig_dir: /etc/homelab/walle
+
+# Node.js of the operator role (root-owned, pinned).
+walle_node_bin: "{{ aioperator_node_dir }}/bin"
+
+# Model endpoint: the local llama router.
+walle_model_base_url: http://127.0.0.1:8080/v1
+walle_model: qwen3.6-35b-a3b
+
+# Resource limits (proposal).
+walle_memory_max: 4G
+walle_cpu_quota: 200%
+
+# The service and the review trigger are installed but off until switched on
+# here. While off, the operator may still start a single run by hand.
+walle_enabled: false
+walle_review_enabled: false
