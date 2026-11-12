@@ -21,6 +21,11 @@ time goes to what a small local model cannot do.
    `toolbox/`. Its runs should become "run the script, act on the exit code".
 3. **Experiment with its configuration:** instructions variants, skills, toolbox, thinking level, turn
    limit (`config.json`, per task as overrides). One lever per experiment, recorded in `progress.md`.
+4. **No monkey-patching.** Never fix its work, and never dictate the fix in a review answer (no
+   corrected values, names or code). Answers say what is wrong and the evidence. Work that is not good
+   is rejected and discarded: abort a running task with a new token in `/srv/walle/inbox/abort`, change
+   the environment (instructions, skills, tools, data, configuration), and give the task again from
+   scratch on a new branch. Ask: does the environment make WALL-E capable?
 
 ## Where things are
 
@@ -30,18 +35,19 @@ time goes to what a small local model cannot do.
 | Progress, one entry per review, experiments | `walle/training/progress.md` |
 | Review procedure | `walle/review/REVIEW.md` |
 | Current stage (enforced by `request_review`) | `walle/training/stage.json` |
-| Its requests / the answers | `/srv/walle/outbox/{pending,done}/`, `/srv/walle/inbox/<id>.json` |
+| Its requests / the answers | `/srv/walle/outbox/{pending,reviewing,done}/`, `/srv/walle/inbox/<id>.json` |
+| Stop a running task | a new token in `/srv/walle/inbox/abort` |
+| Its web access (GET, allowlist) | `walle-fetch.service`, URLs in `journalctl -u walle-fetch` |
 | Tasks, run inputs for replays | `/srv/walle/inbox/tasks/<id>.json`, `/srv/walle/outbox/inputs/` |
 | Transcript | `journalctl -u walle` |
 
-Until a new login, the operator reaches `/srv/walle` with `sg walle -c '...'`.
 
 ## Review a request
 
 1. Follow `walle/review/REVIEW.md`. Verify every claim yourself (read-only kubectl, the wiki). Never
    run its scripts or branch code as yourself; read them.
-2. Answer in `/srv/walle/inbox/<id>.json`, concrete enough for a small model to act on; move the
-   request to `outbox/done/`. Issues and PRs you open from its work carry "Prepared by WALL-E".
+2. Answer in `/srv/walle/inbox/<id>.json` with the verdict, what is wrong and the evidence, but not the
+   fix (principle 4); move the request to `outbox/done/`. Issues and PRs you open from its work carry "Prepared by WALL-E".
 3. Add the entry to `training/progress.md` (verdict, factual errors, revisions, process, craft,
    lesson) and update the summary counters.
 4. Turn each general lesson into data (principle 1), commit with Intent/Key changes, push,
