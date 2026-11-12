@@ -13,6 +13,12 @@
     aioperator_git_email: operator@localhost
     aioperator_git_credential_helper: /usr/local/bin/operator-github-token
   tasks:
+    - name: Create the scratch directory
+      ansible.builtin.file:
+        path: "{{ out }}"
+        state: directory
+        mode: "0755"
+
     - name: Render the templates
       ansible.builtin.template:
         src: "{{ item.src }}"
