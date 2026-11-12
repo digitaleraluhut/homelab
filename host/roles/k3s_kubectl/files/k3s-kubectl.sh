@@ -1,4 +1,4 @@
-# Managed by Ansible (homelab host/roles/k3s-kubectl).
+# Managed by Ansible (homelab host/roles/k3s_kubectl).
 # /usr/local/bin/kubectl is the k3s binary, which reads the root-only server
 # config /etc/rancher/k3s/config.yaml on every call and warns "permission
 # denied" for every other user. kubectl does not need that file. Root keeps it,
