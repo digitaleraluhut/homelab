@@ -1,0 +1,9 @@
+---
+- name: Install the homelab kernel settings
+  ansible.builtin.template:
+    src: 60-homelab.conf.j2
+    dest: /etc/sysctl.d/60-homelab.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Apply kernel settings

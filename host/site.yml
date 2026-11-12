@@ -7,6 +7,8 @@
   roles:
     - role: runner
       tags: [runner]
+    - role: sysctl
+      tags: [sysctl]
     - role: localai
       tags: [localai]
     - role: k3s_kubectl

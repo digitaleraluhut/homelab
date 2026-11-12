@@ -1,0 +1,8 @@
+---
+# Kernel settings for a single-node Kubernetes host. Proposal values, common for
+# k8s nodes: containerd, kubelet and pods each take inotify instances; the
+# Ubuntu default of 128 per user ran out for root on 2026-11-12 (a systemd path
+# unit failed with "Too many open files").
+sysctl_settings:
+  fs.inotify.max_user_instances: 1024
+  fs.inotify.max_user_watches: 524288
