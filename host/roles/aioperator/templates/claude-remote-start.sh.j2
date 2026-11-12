@@ -1,0 +1,17 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# Start Remote Control and reattach to the last session, so a restart keeps the
+# operator's conversation. `--continue` exits right away with an error when no
+# session was recorded here in the last ~4 hours (e.g. after a longer downtime);
+# only then start a new session. A later failure of a reattached session is
+# passed to systemd, which restarts this script and reattaches again.
+CLAUDE={{ aioperator_home }}/.local/bin/claude
+NAME=flinker-digitaleraluhut
+started=$(date +%s)
+"$CLAUDE" remote-control --name "$NAME" --continue
+rc=$?
+if [ "$rc" -ne 0 ] && [ $(( $(date +%s) - started )) -lt 30 ]; then
+  echo "claude-remote-start: nothing to continue (exit $rc), starting a new session" >&2
+  exec "$CLAUDE" remote-control --name "$NAME"
+fi
+exit "$rc"
