@@ -103,6 +103,22 @@
     mode: "0644"
     content: "{{ {'permissions': {'allow': aioperator_claude_allow}} | to_nice_json }}\n"
 
+- name: Create the directory for the operator's helper scripts
+  ansible.builtin.file:
+    path: /usr/local/lib/aioperator
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the Remote Control start script (reattaches to the last session)
+  ansible.builtin.template:
+    src: claude-remote-start.sh.j2
+    dest: /usr/local/lib/aioperator/claude-remote-start
+    owner: root
+    group: root
+    mode: "0755"
+
 # No restart handler on purpose: restarting claude-remote ends the operator's
 # own session. Unit changes take effect at the next restart by the owner or a
 # reboot.
