@@ -15,6 +15,8 @@ WorkingDirectory={{ walle_root }}/work
 Environment=HOME={{ walle_home }}
 Environment=PATH={{ walle_node_bin }}:/usr/local/bin:/usr/bin:/bin
 Environment=KUBECONFIG={{ walle_kubeconfig_dir }}/kubeconfig
+# kubectl is the k3s binary; without this it warns about the root-only server config.
+Environment=K3S_CONFIG_FILE=/dev/null
 Environment=WALLE_ROOT={{ walle_root }}
 Environment=WALLE_MODEL_BASE_URL={{ walle_model_base_url }}
 Environment=WALLE_MODEL={{ walle_model }}

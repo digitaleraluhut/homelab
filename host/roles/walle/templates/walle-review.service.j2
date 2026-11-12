@@ -14,6 +14,7 @@ UMask=0027
 WorkingDirectory={{ walle_reviewer_home }}/projects/digitaleraluhut
 Environment=PATH={{ walle_reviewer_home }}/.local/bin:/usr/local/bin:/usr/bin:/bin
 Environment=KUBECONFIG={{ walle_reviewer_home }}/.kube/config
+Environment=K3S_CONFIG_FILE=/dev/null
 Environment=WALLE_ROOT={{ walle_root }}
 ExecStart={{ walle_root }}/app/bin/review-pending
 TimeoutStartSec=2h
