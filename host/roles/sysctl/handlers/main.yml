@@ -1,0 +1,5 @@
+---
+- name: Apply kernel settings
+  ansible.builtin.command:
+    cmd: sysctl --load /etc/sysctl.d/60-homelab.conf
+  changed_when: true
