@@ -46,6 +46,19 @@ describe("setupAftertouch", () => {
     );
   });
 
+  it("runs the pinned upstream releases, whatever the stack config says", () => {
+    const deployment = created.find((c) => c.name === "aftertouch-deployment");
+    const containers = (
+      deployment?.inputs.spec as {
+        template: { spec: { containers: Array<{ name: string; image: string }> } };
+      }
+    ).template.spec.containers;
+    expect(Object.fromEntries(containers.map((c) => [c.name, c.image]))).toEqual({
+      app: "ghcr.io/gesellix/bose-soundtouch:0.139.0",
+      web: "ghcr.io/gesellix/bose-soundtouch-web:0.114.0",
+    });
+  });
+
   it("keeps the data volume claim name", () => {
     const pvc = created.find((c) => c.name === "aftertouch-pvc");
     expect((pvc?.inputs.metadata as { name: string }).name).toBe("aftertouch-data");

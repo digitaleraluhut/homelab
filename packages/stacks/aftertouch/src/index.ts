@@ -10,8 +10,9 @@
  * Resource names are unchanged, so `pulumi state move` carries the existing resources
  * (including the data volume) over without replacing them.
  *
- * Config (homelab stack, prefix "aftertouch:"): image, nodeIp, nodeName, mgmtUsername (secret),
- * mgmtPassword (secret); optional webImage, preferredDevices, appHostname.
+ * Config (homelab stack, prefix "aftertouch:"): nodeIp, nodeName, mgmtUsername (secret),
+ * mgmtPassword (secret); optional preferredDevices, appHostname. The image versions are pinned
+ * here, not in config, so an update is a reviewed diff.
  */
 
 import * as k8s from "@pulumi/kubernetes";
@@ -22,6 +23,10 @@ import * as pulumi from "@pulumi/pulumi";
 // ---------------------------------------------------------------------------
 
 const APP_NAME = "aftertouch";
+// Before raising a version, read the upstream release notes in between for breaking changes
+// (https://github.com/gesellix/Bose-SoundTouch/releases) and snapshot the volume aftertouch-data.
+const APP_IMAGE = "ghcr.io/gesellix/bose-soundtouch:0.139.0";
+const WEB_IMAGE = "ghcr.io/gesellix/bose-soundtouch-web:0.114.0";
 const NAMESPACE = APP_NAME;
 const APP_PORT = 8000; // HTTP web UI + speaker API (AfterTouch backend)
 const HTTPS_PORT = 8443; // HTTPS for speaker DNS redirect method
@@ -40,8 +45,6 @@ export function setupAftertouch() {
   // ---------------------------------------------------------------------------
 
   const cfg = new pulumi.Config("aftertouch");
-  const appImage = cfg.require("image");
-  const webImage = cfg.get("webImage") ?? "ghcr.io/gesellix/bose-soundtouch-web:0.77";
   const mgmtUsername = cfg.requireSecret("mgmtUsername");
   const mgmtPassword = cfg.requireSecret("mgmtPassword");
   const preferredDevices = cfg.get("preferredDevices");
@@ -146,7 +149,7 @@ export function setupAftertouch() {
             containers: [
               {
                 name: "app",
-                image: appImage,
+                image: APP_IMAGE,
                 ports: [
                   { name: "http", containerPort: APP_PORT },
                   { name: "https", containerPort: HTTPS_PORT },
@@ -175,7 +178,7 @@ export function setupAftertouch() {
               // backend on localhost:8000 (shared network namespace via hostNetwork).
               {
                 name: "web",
-                image: webImage,
+                image: WEB_IMAGE,
                 // Default port is 8080 which is taken by llama.cpp on this host.
                 // Override via the -port flag to use 9090 instead.
                 args: ["-port", `${WEB_PORT}`],
