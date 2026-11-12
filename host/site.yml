@@ -9,6 +9,8 @@
       tags: [runner]
     - role: localai
       tags: [localai]
+    - role: k3s_kubectl
+      tags: [k3s_kubectl]
     - role: aioperator
       tags: [aioperator]
     - role: timeshift

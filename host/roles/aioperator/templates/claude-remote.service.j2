@@ -11,6 +11,8 @@ Environment=PATH={{ aioperator_home }}/.local/bin:/usr/local/bin:/usr/bin:/bin
 # Read-only cluster access (homelab operatorKubeconfig); without it the k3s
 # kubectl wrapper falls back to /etc/rancher/k3s/k3s.yaml.
 Environment=KUBECONFIG={{ aioperator_home }}/.kube/config
+# kubectl is the k3s binary; without this it warns about the root-only server config.
+Environment=K3S_CONFIG_FILE=/dev/null
 ExecStart={{ aioperator_home }}/.local/bin/claude remote-control --name flinker-digitaleraluhut
 Restart=on-failure
 RestartSec=10
