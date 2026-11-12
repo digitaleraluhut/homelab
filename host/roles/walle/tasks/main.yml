@@ -75,6 +75,15 @@
     group: root
     mode: "0755"
 
+- name: Install the GET-only web proxy
+  ansible.builtin.copy:
+    src: walle-fetch.py
+    dest: /usr/local/lib/walle/walle-fetch.py
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart walle-fetch
+
 - name: Install the units
   ansible.builtin.template:
     src: "{{ item }}.j2"
@@ -82,7 +91,7 @@
     owner: root
     group: root
     mode: "0644"
-  loop: [walle.service, walle-review.service, walle-review.path, walle-mirrors.service, walle-mirrors.timer]
+  loop: [walle.service, walle-review.service, walle-review.path, walle-mirrors.service, walle-mirrors.timer, walle-fetch.service]
   notify: Reload systemd
 
 - name: Flush handlers before switching units
@@ -106,5 +115,13 @@
 - name: Keep the mirrors current
   ansible.builtin.systemd_service:
     name: walle-mirrors.timer
+    enabled: true
+    state: started
+
+# Web access is harmless to keep on (GET only, allowlisted); WALL-E reaches it
+# through its tool web_get.
+- name: Keep the web proxy running
+  ansible.builtin.systemd_service:
+    name: walle-fetch.service
     enabled: true
     state: started

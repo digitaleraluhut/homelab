@@ -1,0 +1,41 @@
+# {{ ansible_managed }}
+# GET-only web access for WALL-E (walle-fetch.py). Listens on 127.0.0.1 only;
+# reaches only public addresses (no LAN, tailnet, cluster or metadata ranges),
+# and only hosts on the allowlist (walle_fetch_allow). Every URL is logged.
+[Unit]
+Description=WALL-E web access (GET only, allowlisted)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+DynamicUser=true
+Environment=WALLE_FETCH_PORT={{ walle_fetch_port }}
+Environment="WALLE_FETCH_ALLOW={{ walle_fetch_allow | join(' ') }}"
+ExecStart=/usr/bin/python3 /usr/local/lib/walle/walle-fetch.py
+Restart=on-failure
+RestartSec=10
+
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+NoNewPrivileges=true
+CapabilityBoundingSet=
+RestrictSUIDSGID=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictNamespaces=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressAllow=localhost
+IPAddressDeny=10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10 169.254.0.0/16 fc00::/7 fe80::/10
+MemoryMax=256M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target
