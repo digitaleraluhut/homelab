@@ -58,6 +58,23 @@
     group: "{{ walle_user }}"
     mode: "0644"
 
+- name: Create the directory for WALL-E's host helpers
+  ansible.builtin.file:
+    path: /usr/local/lib/walle
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# Read by the operator's SessionStart hook (aioperator_claude_hooks).
+- name: Install the status script for the operator's sessions
+  ansible.builtin.template:
+    src: walle-status.sh.j2
+    dest: /usr/local/lib/walle/status
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Install the units
   ansible.builtin.template:
     src: "{{ item }}.j2"

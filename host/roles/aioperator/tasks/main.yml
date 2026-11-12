@@ -101,7 +101,7 @@
     owner: root
     group: root
     mode: "0644"
-    content: "{{ {'permissions': {'allow': aioperator_claude_allow}} | to_nice_json }}\n"
+    content: "{{ {'permissions': {'allow': aioperator_claude_allow}, 'hooks': aioperator_claude_hooks} | to_nice_json }}\n"
 
 - name: Create the directory for the operator's helper scripts
   ansible.builtin.file:

@@ -77,6 +77,14 @@ aioperator_skill_dirs:
 # "gh pr merge" only succeeds where no owner review is required.
 aioperator_claude_allow:
   - "Bash(gh pr merge:*)"
+# Claude Code hooks for the operator, in the same managed settings. At start and
+# resume, the session gets WALL-E's status (role walle), so the operator picks
+# up pending reviews and re-arms its watch after a restart.
+aioperator_claude_hooks:
+  SessionStart:
+    - hooks:
+        - type: command
+          command: "test -x /usr/local/lib/walle/status && /usr/local/lib/walle/status || true"
 
 # GitHub access through an org-owned GitHub App instead of a user account.
 # The owner places the App's private key and IDs in this directory by hand

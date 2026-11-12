@@ -1,6 +1,7 @@
 # {{ ansible_managed }}
-# The operator reviews WALL-E's pending requests in a headless Claude Code run
-# (owner decision 2026-11-12). The job must move every request out of
+# Handles WALL-E's pending requests as the operator. In notify mode (default) it
+# only moves each request to outbox/reviewing/ and logs it; in review mode it
+# reviews in a headless Claude Code run. The job must move every request out of
 # outbox/pending, or the path unit starts it again; the start limit stops a loop.
 [Unit]
 Description=Operator review of WALL-E's requests
@@ -16,5 +17,6 @@ Environment=PATH={{ walle_reviewer_home }}/.local/bin:/usr/local/bin:/usr/bin:/b
 Environment=KUBECONFIG={{ walle_reviewer_home }}/.kube/config
 Environment=K3S_CONFIG_FILE=/dev/null
 Environment=WALLE_ROOT={{ walle_root }}
+Environment=WALLE_REVIEW_MODE={{ walle_review_mode }}
 ExecStart={{ walle_root }}/app/bin/review-pending
 TimeoutStartSec=2h

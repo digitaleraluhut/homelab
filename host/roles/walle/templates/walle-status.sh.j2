@@ -1,0 +1,20 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# WALL-E status for the operator, printed into every Claude Code session at start
+# and resume (SessionStart hook, managed settings). Read-only and fast; prints
+# nothing and exits 0 when WALL-E is not set up or not readable.
+ROOT={{ walle_root }}
+[ -r "$ROOT/outbox" ] || exit 0
+count() { ls "$1" 2>/dev/null | grep -c '\.json$'; }
+waiting=$(count "$ROOT/outbox/pending"); reviewing=$(count "$ROOT/outbox/reviewing")
+tasks=$(ls "$ROOT/inbox/tasks" 2>/dev/null | grep -c '\.json$')
+echo "## WALL-E (apprentice) status"
+echo "- Service: $(systemctl is-active walle.service 2>/dev/null); requests waiting for your review: $((waiting + reviewing)); task files: $tasks"
+for f in "$ROOT"/outbox/reviewing/*.json "$ROOT"/outbox/pending/*.json; do
+  [ -f "$f" ] || continue
+  echo "  - $(basename "$f" .json): since $(date -u -r "$f" +%Y-%m-%dT%H:%MZ)"
+done
+echo "- Last run: $(journalctl -u walle.service -o cat -n 200 --no-pager 2>/dev/null | grep -E '^\[walle\] (run|cycle|nothing)' | tail -1)"
+echo "- Use skill train-walle. Re-arm the watch with Monitor:"
+echo "  journalctl -u walle -u walle-review -f -n 0 -o cat | grep --line-buffered -E 'call (propose_issue|submit_)|error (propose_issue|submit_)|review request|run .* started|cycle failed|report '"
+exit 0
