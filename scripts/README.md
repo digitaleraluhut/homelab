@@ -14,6 +14,16 @@ status. Credentials are never printed.
 ./scripts/analyze-longhorn-storage.sh --context flinker
 ```
 
+### `longhorn-restore-test.sh`
+
+Restores the newest completed backup of a Longhorn volume into a temporary
+volume, mounts it read-only in namespace `restore-test`, prints a listing and
+cleans up again. The source volume is not touched. Needs cluster admin.
+
+```bash
+./scripts/longhorn-restore-test.sh <pv-name> [--keep]
+```
+
 ### `install-k3s.sh`
 Installs K3s on the system with proper configuration.
 
