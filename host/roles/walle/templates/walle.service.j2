@@ -1,0 +1,57 @@
+# {{ ansible_managed }}
+# WALL-E: long-running host program (pi Durable) from {{ walle_root }}/app.
+# Fenced: no network except localhost (model, Kubernetes API), read-only system,
+# writes only to its work and outbox directories and its state.
+[Unit]
+Description=WALL-E apprentice (monitors and tidies the homelab)
+After=network-online.target k3s.service
+Wants=network-online.target
+
+[Service]
+User={{ walle_user }}
+Group={{ walle_user }}
+UMask=0007
+WorkingDirectory={{ walle_root }}/work
+Environment=HOME={{ walle_home }}
+Environment=PATH={{ walle_node_bin }}:/usr/local/bin:/usr/bin:/bin
+Environment=KUBECONFIG={{ walle_kubeconfig_dir }}/kubeconfig
+# kubectl is the k3s binary; without this it warns about the root-only server config.
+Environment=K3S_CONFIG_FILE=/dev/null
+Environment=WALLE_ROOT={{ walle_root }}
+Environment=WALLE_MODEL_BASE_URL={{ walle_model_base_url }}
+Environment=WALLE_MODEL={{ walle_model }}
+ExecStart={{ walle_node_bin }}/node {{ walle_root }}/app/dist/main.js
+Restart=on-failure
+RestartSec=60
+
+StateDirectory=walle
+StateDirectoryMode=0700
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ walle_root }}/work {{ walle_root }}/outbox
+ReadOnlyPaths={{ walle_root }}/app {{ walle_root }}/repos {{ walle_root }}/inbox {{ walle_kubeconfig_dir }}
+PrivateTmp=true
+PrivateDevices=true
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictNamespaces=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax={{ walle_memory_max }}
+CPUQuota={{ walle_cpu_quota }}
+TasksMax=256
+
+[Install]
+WantedBy=multi-user.target

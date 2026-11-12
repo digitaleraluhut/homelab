@@ -78,7 +78,14 @@ export const operatorClusterReadRules: k8s.types.input.rbac.v1.PolicyRule[] = [
   },
 ];
 
-export function createOperatorAccess(args: { apiServer: pulumi.Input<string> }) {
+export function createOperatorAccess(args: {
+  apiServer: pulumi.Input<string>;
+  /**
+   * Further service accounts with the same read-only rights, each with its own
+   * token and kubeconfig (e.g. "walle", the apprentice agent on the node).
+   */
+  readers?: string[];
+}) {
   const ns = new k8s.core.v1.Namespace("operator-access-ns", {
     metadata: {
       name: NAMESPACE,
@@ -141,5 +148,65 @@ export function createOperatorAccess(args: { apiServer: pulumi.Input<string> }) 
       renderKubeconfig(data, server, `${NAMESPACE}-${SA_NAME}`, "homelab-operator-readonly")
     );
 
-  return { serviceAccount: sa, kubeconfig: pulumi.secret(kubeconfig) };
+  const readers: Record<string, pulumi.Output<string>> = {};
+  for (const name of args.readers ?? []) {
+    readers[name] = createReader(name, ns, clusterRead, args.apiServer);
+  }
+
+  return { serviceAccount: sa, kubeconfig: pulumi.secret(kubeconfig), readers };
+}
+
+/** Another read-only identity: same view + cluster-read rights, own token. */
+function createReader(
+  name: string,
+  ns: k8s.core.v1.Namespace,
+  clusterRead: k8s.rbac.v1.ClusterRole,
+  apiServer: pulumi.Input<string>
+): pulumi.Output<string> {
+  const id = `operator-access-${name}`;
+  const sa = new k8s.core.v1.ServiceAccount(`${id}-sa`, {
+    metadata: { name, namespace: ns.metadata.name, labels: LABELS },
+  });
+  const subject = { kind: "ServiceAccount", name, namespace: NAMESPACE };
+
+  new k8s.rbac.v1.ClusterRoleBinding(`${id}-view`, {
+    metadata: { name: `operator-access:${name}:view`, labels: LABELS },
+    roleRef: { apiGroup: "rbac.authorization.k8s.io", kind: "ClusterRole", name: "view" },
+    subjects: [subject],
+  });
+  new k8s.rbac.v1.ClusterRoleBinding(`${id}-cluster-read`, {
+    metadata: { name: `operator-access:${name}:cluster-read`, labels: LABELS },
+    roleRef: {
+      apiGroup: "rbac.authorization.k8s.io",
+      kind: "ClusterRole",
+      name: clusterRead.metadata.name,
+    },
+    subjects: [subject],
+  });
+
+  const tokenSecret = new k8s.core.v1.Secret(
+    `${id}-token`,
+    {
+      metadata: {
+        name: `${name}-token`,
+        namespace: NAMESPACE,
+        labels: LABELS,
+        annotations: { "kubernetes.io/service-account.name": name },
+      },
+      type: "kubernetes.io/service-account-token",
+    },
+    { dependsOn: [sa] }
+  );
+  const token = k8s.core.v1.Secret.get(
+    `${id}-token-read`,
+    pulumi.interpolate`${NAMESPACE}/${tokenSecret.metadata.name}`,
+    { dependsOn: [tokenSecret] }
+  );
+
+  const kubeconfig = pulumi
+    .all([token.data, pulumi.output(apiServer)])
+    .apply(([data, server]) =>
+      renderKubeconfig(data, server, `${NAMESPACE}-${name}`, `homelab-${name}-readonly`)
+    );
+  return pulumi.secret(kubeconfig);
 }

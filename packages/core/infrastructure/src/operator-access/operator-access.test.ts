@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 type Created = { type: string; name: string; inputs: Record<string, unknown> };
 const created: Created[] = [];
+let access: { readers: Record<string, unknown> };
 
 beforeAll(async () => {
   pulumi.runtime.setMocks(
@@ -18,7 +19,7 @@ beforeAll(async () => {
     false
   );
   const { createOperatorAccess } = await import("./index");
-  createOperatorAccess({ apiServer: "https://127.0.0.1:6443" });
+  access = createOperatorAccess({ apiServer: "https://127.0.0.1:6443", readers: ["walle"] });
   await new Promise((r) => setTimeout(r, 50));
 });
 
@@ -78,5 +79,34 @@ describe("createOperatorAccess", () => {
     ]) {
       expect(can(resource)).toBe(true);
     }
+  });
+});
+
+describe("additional read-only readers (WALL-E)", () => {
+  type Subject = { kind: string; name: string; namespace: string };
+  const subjectsOf = (name: string) =>
+    (created.find((c) => c.name === name)?.inputs.subjects as Subject[]) ?? [];
+
+  it("creates its own service account", () => {
+    const sa = created.find((c) => c.name === "operator-access-walle-sa");
+    expect((sa?.inputs.metadata as { name: string }).name).toBe("walle");
+  });
+
+  it("binds it to view and to the shared cluster-read role, nothing else", () => {
+    const view = created.find((c) => c.name === "operator-access-walle-view");
+    expect((view?.inputs.roleRef as { name: string }).name).toBe("view");
+    expect(subjectsOf("operator-access-walle-view").map((s) => s.name)).toEqual(["walle"]);
+    expect(subjectsOf("operator-access-walle-cluster-read").map((s) => s.name)).toEqual(["walle"]);
+    const roles = created.filter((c) => c.type.endsWith("/v1:ClusterRole"));
+    expect(roles.map((r) => r.name)).toEqual(["operator-access-cluster-read"]);
+  });
+
+  it("keeps the operator's resources as they are", () => {
+    expect(subjectsOf("operator-access-view").map((s) => s.name)).toEqual(["aioperator"]);
+    expect(created.some((c) => c.name === "operator-access-sa")).toBe(true);
+  });
+
+  it("returns a kubeconfig per reader", () => {
+    expect(Object.keys(access.readers)).toEqual(["walle"]);
   });
 });

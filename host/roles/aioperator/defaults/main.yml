@@ -34,6 +34,12 @@ aioperator_sudo_aliases:
     - /usr/bin/systemctl --user -M localai@ stop llama-server@lab.service
     - /usr/bin/systemctl --user -M localai@ restart llama-server@lab.service
     - /usr/bin/systemctl --user -M localai@ --no-pager status *
+  # WALL-E (role walle): run, stop and inspect the apprentice and the review job.
+  AIOPERATOR_WALLE:
+    - /usr/bin/systemctl start walle.service
+    - /usr/bin/systemctl stop walle.service
+    - /usr/bin/systemctl restart walle.service
+    - /usr/bin/systemctl start walle-review.service
   # Mints a 1h GitHub App installation token; no arguments allowed. No
   # NOEXEC: the helper runs openssl to sign the App JWT.
   AIOPERATOR_GITHUB:
@@ -47,7 +53,7 @@ aioperator_sudo_aliases:
 # Each rule: "(runas) tags: aliases", rendered as "<user> ALL=<rule>".
 aioperator_sudo_rules:
   - "(root) NOPASSWD:NOEXEC: AIOPERATOR_DIAG"
-  - "(root) NOPASSWD: AIOPERATOR_MAINT, AIOPERATOR_SVC, AIOPERATOR_AI, AIOPERATOR_GITHUB"
+  - "(root) NOPASSWD: AIOPERATOR_MAINT, AIOPERATOR_SVC, AIOPERATOR_AI, AIOPERATOR_GITHUB, AIOPERATOR_WALLE"
   - "(localai) NOPASSWD: AIOPERATOR_LOCALAI_READ"
 
 # Agent skills: name -> directory the symlink points to.

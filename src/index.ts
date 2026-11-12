@@ -71,8 +71,13 @@ export const ciAppsKubeconfig = ciAccess.kubeconfig;
 // so the API server is reached via loopback (127.0.0.1 is in the API cert SANs).
 import { createOperatorAccess } from "@mrsimpson/homelab-core-infrastructure";
 
-const operatorAccess = createOperatorAccess({ apiServer: "https://127.0.0.1:6443" });
+// "walle": the apprentice agent on the node (host role walle), same read-only rights.
+const operatorAccess = createOperatorAccess({
+  apiServer: "https://127.0.0.1:6443",
+  readers: ["walle"],
+});
 export const operatorKubeconfig = operatorAccess.kubeconfig;
+export const walleKubeconfig = operatorAccess.readers.walle;
 
 // Observability stack — VictoriaMetrics + Grafana
 import { setupObservability } from "@mrsimpson/homelab-observability";

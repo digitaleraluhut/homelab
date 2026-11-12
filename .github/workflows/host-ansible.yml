@@ -62,3 +62,6 @@ jobs:
 
       - name: Node.js for the operator
         run: ansible-playbook tests/node.yml -e out="$RUNNER_TEMP/node"
+
+      - name: WALL-E units and git configs
+        run: ansible-playbook tests/walle.yml -e out="$RUNNER_TEMP/walle"
