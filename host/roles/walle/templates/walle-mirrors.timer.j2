@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Update WALL-E's repository mirrors hourly
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

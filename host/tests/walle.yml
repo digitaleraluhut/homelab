@@ -28,6 +28,7 @@
         - {src: ../roles/walle/templates/walle.service.j2, dest: walle.service}
         - {src: ../roles/walle/templates/walle-review.service.j2, dest: walle-review.service}
         - {src: ../roles/walle/templates/walle-review.path.j2, dest: walle-review.path}
+        - {src: ../roles/walle/templates/walle-mirrors.service.j2, dest: walle-mirrors.service}
         - {src: ../roles/walle/templates/walle-gitconfig.j2, dest: walle.gitconfig}
         - {src: ../roles/aioperator/templates/gitconfig.j2, dest: operator.gitconfig}
 
@@ -35,7 +36,7 @@
       ansible.builtin.slurp:
         src: "{{ out }}/{{ item }}"
       register: rendered
-      loop: [walle.service, walle-review.service, operator.gitconfig, walle.gitconfig]
+      loop: [walle.service, walle-review.service, walle-mirrors.service, operator.gitconfig, walle.gitconfig]
 
     - name: Check the fences
       vars:
@@ -53,6 +54,8 @@
           - "'ReadOnlyPaths=/srv/walle/app /srv/walle/repos /srv/walle/inbox' in files['walle.service']"
           # The review job runs as the operator.
           - "'User=aioperator' in files['walle-review.service']"
+          # The mirrors are updated by the operator, never by WALL-E.
+          - "'User=aioperator' in files['walle-mirrors.service']"
           # Each side trusts the other's repositories, and only those.
           - "'directory = /srv/walle/work/homelab' in files['operator.gitconfig']"
           - "'directory = /srv/walle/repos/homelab' in files['walle.gitconfig']"
