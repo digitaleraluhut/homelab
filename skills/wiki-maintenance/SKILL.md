@@ -1,6 +1,6 @@
 ---
 name: wiki-maintenance
-description: Keep the private homelab wiki (digitaleraluhut/homelab-wiki, rendered at wiki.no-panic.org) current. Use (1) whenever a decision about the homelab is taken or changed during a session, (2) after merged/deployed changes that alter how the homelab works (infra, apps, access, CI, secrets handling, host), (3) after an incident was resolved or a runbook turned out missing or wrong, and (4) as a short retro at the end of a homelab work session ("retro", "Session abschließen", "wiki pflegen"), and (5) whenever you create something lasting that must be kept current (a talk, a routine, a script, a data file). Records current state and runbooks only; open items become GitHub issues.
+description: "Keep the homelab wiki (homelab-wiki) current: after decisions, merged and deployed changes, incidents, when creating something lasting (upkeep), at session start, and as an end-of-session retro."
 ---
 
 # Wiki maintenance

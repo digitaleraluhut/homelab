@@ -1,6 +1,6 @@
 ---
 name: train-walle
-description: How the operator trains and delegates to WALL-E, the apprentice agent on the local model. Use whenever WALL-E has a review request (/srv/walle/outbox/pending), after one of its runs, when giving it a task or replaying one, when changing its instructions, skills, toolbox or configuration, for the weekly assessment of its progress, and whenever a recurring piece of work could be delegated to it. Includes when and how to escalate to the owner if WALL-E is not capable enough.
+description: "Train and delegate to WALL-E, the local-model apprentice: review its requests, give or replay tasks, change its environment, assess weekly, escalate if incapable."
 ---
 
 # Training WALL-E
