@@ -158,6 +158,9 @@ jobs:
           command: ${{ inputs.pulumi-command }}
           stack-name: ${{ inputs.pulumi-stack }}
           work-dir: ${{ inputs.working-directory }}
+          # A new app's stack is created on its first deploy. Apps with `secure:` config values still
+          # need the stack created locally first (the values are encrypted with the stack's key).
+          upsert: true
           # On 'up', refresh state first to avoid drift surprises.
           # On 'preview', skip refresh for speed.
           refresh: ${{ inputs.pulumi-command == 'up' }}
