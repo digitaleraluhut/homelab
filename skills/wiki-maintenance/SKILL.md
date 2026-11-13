@@ -1,6 +1,6 @@
 ---
 name: wiki-maintenance
-description: Keep the private homelab wiki (digitaleraluhut/homelab-wiki, rendered at wiki.no-panic.org) current. Use (1) whenever a decision about the homelab is taken or changed during a session, (2) after merged/deployed changes that alter how the homelab works (infra, apps, access, CI, secrets handling, host), (3) after an incident was resolved or a runbook turned out missing or wrong, and (4) as a short retro at the end of a homelab work session ("retro", "Session abschließen", "wiki pflegen"). Records current state and runbooks only; open items become GitHub issues.
+description: "Keep the homelab wiki (homelab-wiki) current: after decisions, merged and deployed changes, incidents, when creating something lasting (upkeep), at session start, and as an end-of-session retro."
 ---
 
 # Wiki maintenance
@@ -16,6 +16,8 @@ This skill covers *when* to update and *what* goes in.
 | A decision is taken or changed (by the owner, or agreed in the session) | Update the affected page(s) right away, while the reasoning is fresh: the decision as current state, date, who decided, link to the PR/issue/message. Replace the superseded statement — history belongs in `log.md`, not on the page. |
 | A change is merged **and** deployed/observed | Update state pages; adjust runbooks the change affects. |
 | An incident was diagnosed and fixed, or a runbook was missing/wrong | Fix or add the runbook (steps that actually worked). Use the incident as a worked example if it helps. |
+| You created something lasting that must be kept current (a talk, a routine, a script, a data file, a page) | In the same commit, add an `upkeep` entry (`what`, `when`) to the frontmatter of the page that describes it. `wiki/maintenance.md` is generated from these entries by the pre-commit hook (`git config core.hooksPath .githooks` once per clone); never edit it by hand. |
+| Session start, or a milestone that may make something due | Read the section "What the operator keeps current" (shown at session start) and do what is due. |
 | End of a homelab session | Run the retro below. |
 
 Not a trigger: unmerged branches, plans, speculation, transient states that are being fixed right now

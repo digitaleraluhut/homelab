@@ -1,6 +1,6 @@
 ---
 name: workflow-handoff
-description: Hand a GitHub Actions workflow change to the homelab owner. Use whenever a change must add, edit or delete a file under .github/workflows/ in digitaleraluhut/homelab, homelab-apps, local-ai or homelab-wiki, and whenever GitHub refuses a push with "refusing to allow a GitHub App to create or update workflow ... without `workflows` permission". The operator's GitHub App deliberately cannot push workflow files; this skill says what to do instead.
+description: "Hand a .github/workflows/ change to the owner: the operator's App cannot push workflow files (\"refusing to allow a GitHub App … without `workflows` permission\")."
 ---
 
 # Workflow handoff
