@@ -11,15 +11,17 @@ import * as pulumi from "@pulumi/pulumi";
  * See docs/howto/deploy-database.md for usage and the restore runbook.
  */
 
-// CNPG webhook rejects tags that don't start with the PG major version (e.g. "latest-pg18").
-const DEFAULT_IMAGE = "postgres:18";
+// CloudNativePG's own image: its postgres user has UID/GID 26, CNPG's default. The Docker Hub image
+// (postgres:18) runs as 999, and initdb fails ("could not look up effective user ID 26").
+// CNPG's webhook rejects tags that don't start with the PG major version (e.g. "latest-pg18").
+const DEFAULT_IMAGE = "ghcr.io/cloudnative-pg/postgresql:18";
 const DEFAULT_USERNAME = "app"; // CNPG convention: app user owns the app database
 const DEFAULT_STORAGE_SIZE = "5Gi";
 const DEFAULT_STORAGE_CLASS = "longhorn-persistent";
 const DEFAULT_INSTANCES = 1;
 const PG_PORT = 5432;
-// Official postgres image (Debian) uses UID/GID 26 — matches CNPG's own default.
-// Override at call site for non-standard images (paradedb uses 999).
+// UID/GID of the postgres user in CNPG's images. Override at call site for other images
+// (the Docker Hub postgres image and paradedb use 999).
 const DEFAULT_POSTGRES_UID = 26;
 const DEFAULT_POSTGRES_GID = 26;
 export interface PostgresInstanceArgs {
@@ -32,7 +34,7 @@ export interface PostgresInstanceArgs {
   /**
    * Container image for Postgres.
    * Must start with the PG major version (e.g. `18`) — CNPG's webhook rejects `latest`.
-   * @default "postgres:18"
+   * @default "ghcr.io/cloudnative-pg/postgresql:18"
    */
   image?: pulumi.Input<string>;
 
@@ -54,7 +56,7 @@ export interface PostgresInstanceArgs {
   instances?: number;
 
   /**
-   * UID/GID for the postgres OS user. Official postgres image uses 26; paradedb uses 999.
+   * UID/GID for the postgres OS user. CNPG images use 26; the Docker Hub postgres image and paradedb use 999.
    * **Immutable** — changing requires cluster deletion and recreation.
    * @default 26
    */
