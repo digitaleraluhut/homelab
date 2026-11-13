@@ -85,6 +85,12 @@ aioperator_claude_hooks:
     - hooks:
         - type: command
           command: "test -x /usr/local/lib/walle/status && /usr/local/lib/walle/status || true"
+        # What the operator keeps current: generated from the wiki pages' `upkeep`
+        # frontmatter (homelab-wiki: tools/maintenance.py, pre-commit hook).
+        - type: command
+          command: >-
+            f={{ aioperator_workspace }}/homelab-wiki/wiki/maintenance.md;
+            test -r "$f" && sed -n '/^## What the operator keeps current/,/^## Pages by/p' "$f" | sed '$d' || true
 
 # GitHub access through an org-owned GitHub App instead of a user account.
 # The owner places the App's private key and IDs in this directory by hand
