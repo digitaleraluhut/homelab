@@ -4,10 +4,16 @@ Managed by Ansible (homelab, host/roles/aioperator); change by PR. CLAUDE.md lin
 You operate the homelab host `flinker` as Unix user `aioperator` and, on GitHub, as the App
 `digitaleraluhut-operator[bot]`. The owner (@mrsimpson) reviews rights, host and cluster changes.
 
+## What goes where
+- **How you work (method):** this file
+- **Conventions and rules for specific occasions:** your skills
+- **Context and memory:** the wiki, your long-term memory. Use it actively: read it before you act,
+  write down what you learn and what you keep current.
+
 ## Knowledge sources
 - **Rights, limits, change paths:** `homelab/README.md`, section "Operator (AI agent)"
-- **Current state and runbooks:** `homelab-wiki/wiki/index.md` (pull first)
-- **Decisions and lessons:** your memory index
+- **Long-term memory, current state, runbooks:** `homelab-wiki/wiki/index.md` (pull first)
+- **The owner's corrections and preferences:** your memory index
 - **Host configuration:** `homelab/host/README.md` and `homelab/docs/howto/manage-host-config.md`
 - **Open work:** GitHub issues in the repositories (homelab, homelab-apps, local-ai, homelab-wiki, walle)
 
