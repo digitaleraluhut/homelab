@@ -1,0 +1,51 @@
+# {{ ansible_managed }}
+# WALL-E's cluster reads without the token in its reach: kubectl proxy holds the
+# token (a systemd credential, readable only by this service) and serves the API
+# on a unix socket that only group {{ walle_user }} can open. Reads only: other
+# methods, exec, attach and port-forward are refused here, and RBAC is read-only.
+[Unit]
+Description=WALL-E cluster access (kubectl proxy on a unix socket, read-only)
+After=network-online.target k3s.service
+Wants=network-online.target
+ConditionPathExists={{ walle_kubeconfig_dir }}/kubeconfig
+
+[Service]
+User={{ walle_kube_user }}
+Group={{ walle_user }}
+UMask=0007
+LoadCredential=kubeconfig:{{ walle_kubeconfig_dir }}/kubeconfig
+Environment=KUBECONFIG=%d/kubeconfig
+Environment=K3S_CONFIG_FILE=/dev/null
+Environment=HOME={{ walle_kube_socket_dir }}
+RuntimeDirectory={{ walle_kube_socket_dir | basename }}
+RuntimeDirectoryMode=0750
+ExecStart=/usr/local/bin/kubectl proxy --unix-socket={{ walle_kube_socket_dir }}/api.sock \
+  --reject-methods=^(POST|PUT|PATCH|DELETE|CONNECT)$$ \
+  --reject-paths=^/api/.*/pods/.*/(exec|attach|portforward)
+Restart=on-failure
+RestartSec=10
+
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictNamespaces=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax=256M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target
