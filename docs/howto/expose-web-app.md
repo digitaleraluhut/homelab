@@ -175,6 +175,9 @@ homelab.createExposedWebApp("my-app", {
   // Persistent storage
   storage: { size: "10Gi", mountPath: "/data", storageClass: "longhorn" },
 
+  // Stop the old pod before starting the new one (single-writer apps, ReadWriteOnce volumes)
+  strategy: "Recreate",
+
   // Resources
   resources: {
     requests: { cpu: "100m", memory: "128Mi" },

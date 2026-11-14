@@ -29,6 +29,12 @@ beforeAll(async () => {
     port: 8080,
     storage: { size: "1Gi", mountPath: "/data", storageClass: "longhorn-persistent" },
   });
+  new ExposedWebApp("single-writer", {
+    image: "nginxinc/nginx-unprivileged:alpine",
+    domain: "single-writer.example.org",
+    port: 8080,
+    strategy: "Recreate",
+  });
   await new Promise((r) => setTimeout(r, 200));
 });
 
@@ -39,11 +45,31 @@ describe("ExposedWebApp with storage", () => {
   });
 
   it("mounts the PVC by its fixed name", () => {
-    const dep = created.find((c) => c.type === "kubernetes:apps/v1:Deployment");
+    const dep = created.find(
+      (c) => c.type === "kubernetes:apps/v1:Deployment" && c.name === "demo-deployment"
+    );
     type Spec = {
       template: { spec: { volumes: Array<{ persistentVolumeClaim?: { claimName: string } }> } };
     };
     const volumes = (dep?.inputs.spec as Spec).template.spec.volumes;
     expect(volumes.map((v) => v.persistentVolumeClaim?.claimName)).toContain("demo-storage");
+  });
+});
+
+describe("ExposedWebApp deployment strategy", () => {
+  type Dep = { metadata: { name: string }; strategy?: { type: string } };
+  const spec = (name: string) =>
+    created.find(
+      (c) => c.type === "kubernetes:apps/v1:Deployment" && c.name === `${name}-deployment`
+    )?.inputs.spec as Dep | undefined;
+
+  it("keeps Kubernetes' default (rolling update) unless asked", () => {
+    expect(spec("demo")?.strategy).toBeUndefined();
+  });
+
+  it("stops the old pod before starting the new one with Recreate", () => {
+    // Apps whose data volume is ReadWriteOnce or that lock files in it (e.g. Gitea's queue
+    // database) cannot run two pods at once during a rollout.
+    expect(spec("single-writer")?.strategy).toEqual({ type: "Recreate" });
   });
 });

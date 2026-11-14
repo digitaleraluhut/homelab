@@ -151,6 +151,13 @@ export interface ExposedWebAppArgs {
   port: number;
   /** Number of replicas (defaults to 1) */
   replicas?: number;
+
+  /**
+   * Deployment strategy. Default: Kubernetes' rolling update (new pod first, then the old one stops).
+   * Use `"Recreate"` for apps that cannot run two pods at once: a ReadWriteOnce data volume, or a
+   * lock in it (Gitea's queue database fails with "unable to lock level db" during a rollout).
+   */
+  strategy?: "RollingUpdate" | "Recreate";
   /** Override the container entrypoint (maps to K8s container.command) */
   command?: string[];
   /** Container arguments (maps to K8s container.args) */
@@ -520,6 +527,7 @@ export class ExposedWebApp extends pulumi.ComponentResource {
         },
         spec: {
           replicas: args.replicas || 1,
+          ...(args.strategy ? { strategy: { type: args.strategy } } : {}),
           selector: {
             matchLabels: {
               app: name,
