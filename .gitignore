@@ -41,3 +41,6 @@ secrets/
 .crowd
 .vibe/beads-state-*.json
 scripts/flinker-ai-rbac.yaml
+
+# Python
+__pycache__/
