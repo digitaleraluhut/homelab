@@ -22,6 +22,9 @@ RuntimeDirectoryMode=0750
 ExecStart=/usr/local/bin/kubectl proxy --unix-socket={{ walle_kube_socket_dir }}/api.sock \
   --reject-methods=^(POST|PUT|PATCH|DELETE|CONNECT)$$ \
   --reject-paths=^/api/.*/pods/.*/(exec|attach|portforward)
+# kubectl creates the socket with mode 0700 whatever the umask (observed 2026-11-14), so the
+# bridge (group {{ walle_user }}) got "Permission denied". Open it to the group once it exists.
+ExecStartPost=/bin/sh -c 'for i in $$(seq 100); do [ -S {{ walle_kube_socket_dir }}/api.sock ] && exec chmod 0660 {{ walle_kube_socket_dir }}/api.sock; sleep 0.1; done; echo "socket did not appear" >&2; exit 1'
 Restart=on-failure
 RestartSec=10
 

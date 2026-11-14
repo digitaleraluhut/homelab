@@ -83,6 +83,7 @@
           - "'Group=walle' in files['walle-kube.service']"
           - "'LoadCredential=kubeconfig:' + walle_kubeconfig_dir + '/kubeconfig' in files['walle-kube.service']"
           - "'--unix-socket=' + walle_kube_socket_dir + '/api.sock' in files['walle-kube.service']"
+          - "'exec chmod 0660 ' + walle_kube_socket_dir + '/api.sock' in files['walle-kube.service']"
           - "'--reject-methods=^(POST|PUT|PATCH|DELETE|CONNECT)$$' in files['walle-kube.service']"
           - "'UMask=0007' in files['walle-kube.service']"
           - "'RuntimeDirectoryMode=0750' in files['walle-kube.service']"
