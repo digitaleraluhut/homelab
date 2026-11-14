@@ -30,10 +30,19 @@ walle_dirs:
 walle_repositories: [homelab, homelab-apps, local-ai, homelab-wiki]
 
 # Read-only cluster access (Pulumi output walleKubeconfig of the homelab stack).
-# Placed by the owner, like the operator's kubeconfig:
+# WALL-E never sees the token (owner, 2026-11-14): only root can read the file,
+# systemd hands it to walle-kube.service (kubectl proxy, user walle-kube) and to
+# walle-fetch.service (to screen for it) as a credential. WALL-E's kubectl uses a
+# token-less kubeconfig pointing at walle-kube-bridge on 127.0.0.1, which serves
+# only the walle user. Placed by the owner, like the operator's kubeconfig:
 #   pulumi stack output walleKubeconfig --show-secrets \
-#     | sudo install -D -m 640 -o root -g walle /dev/stdin /etc/homelab/walle/kubeconfig
+#     | sudo install -D -m 600 -o root -g root /dev/stdin /etc/homelab/walle/kubeconfig
+#   sudo systemctl restart walle-kube.service walle-fetch.service   # credentials are read at start
 walle_kubeconfig_dir: /etc/homelab/walle
+walle_kube_user: walle-kube
+walle_kube_socket_dir: /run/walle-kube
+walle_kube_bridge_port: 8899
+walle_kube_kubeconfig: /usr/local/lib/walle/kubeconfig   # token-less, WALL-E's KUBECONFIG
 
 # Node.js of the operator role (root-owned, pinned).
 walle_node_bin: "{{ aioperator_node_dir }}/bin"
@@ -55,19 +64,8 @@ walle_enabled: false
 walle_review_enabled: true
 walle_review_mode: notify   # notify | review (headless Claude Code)
 
-# GET-only web access (walle-fetch.service, 127.0.0.1). Allowlist (owner,
-# 2026-11-12): documentation and registries; a domain includes its subdomains.
+# GET-only web access (walle-fetch.service, 127.0.0.1) to any public HTTPS host
+# (owner, 2026-11-14; was an allowlist, homelab#142). What matters is that no
+# credential leaves: URLs are screened for the kube token and credential-shaped
+# strings; refusals are logged as "fetch SCREENED".
 walle_fetch_port: 8898
-walle_fetch_allow:
-  - docs.gitea.com
-  - cloudnative-pg.io
-  - kubernetes.io
-  - www.pulumi.com
-  - longhorn.io
-  - doc.traefik.io
-  - hub.docker.com
-  - ghcr.io
-  - registry.npmjs.org
-  - www.npmjs.com
-  - github.com
-  - raw.githubusercontent.com

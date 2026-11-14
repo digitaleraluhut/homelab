@@ -31,6 +31,9 @@
         - {src: ../roles/walle/templates/walle-mirrors.service.j2, dest: walle-mirrors.service}
         - {src: ../roles/walle/templates/walle-status.sh.j2, dest: walle-status.sh}
         - {src: ../roles/walle/templates/walle-fetch.service.j2, dest: walle-fetch.service}
+        - {src: ../roles/walle/templates/walle-kube.service.j2, dest: walle-kube.service}
+        - {src: ../roles/walle/templates/walle-kube-bridge.service.j2, dest: walle-kube-bridge.service}
+        - {src: ../roles/walle/templates/walle-kubeconfig.j2, dest: walle.kubeconfig}
         - {src: ../roles/walle/templates/walle-gitconfig.j2, dest: walle.gitconfig}
         - {src: ../roles/aioperator/templates/gitconfig.j2, dest: operator.gitconfig}
 
@@ -38,7 +41,16 @@
       ansible.builtin.slurp:
         src: "{{ out }}/{{ item }}"
       register: rendered
-      loop: [walle.service, walle-review.service, walle-mirrors.service, walle-fetch.service, operator.gitconfig, walle.gitconfig]
+      loop:
+        - walle.service
+        - walle-review.service
+        - walle-mirrors.service
+        - walle-fetch.service
+        - walle-kube.service
+        - walle-kube-bridge.service
+        - walle.kubeconfig
+        - operator.gitconfig
+        - walle.gitconfig
 
     - name: Check the fences
       vars:
@@ -59,9 +71,34 @@
           - "'User=aioperator' in files['walle-review.service']"
           # The mirrors are updated by the operator, never by WALL-E.
           - "'User=aioperator' in files['walle-mirrors.service']"
-          # The web proxy reaches no internal network.
-          - "'IPAddressDeny=10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10' in files['walle-fetch.service']"
+          # WALL-E cannot read the kube token: its kubeconfig has none and points at
+          # the bridge; the token's directory is hidden from the service.
+          - "'KUBECONFIG=' + walle_kube_kubeconfig in files['walle.service']"
+          - "'InaccessiblePaths=-' + walle_kubeconfig_dir in files['walle.service']"
+          - "files['walle.service'] is not search('ReadOnlyPaths=.*' + walle_kubeconfig_dir)"
+          - "'token:' not in files['walle.kubeconfig']"
+          - "'server: http://127.0.0.1:' + (walle_kube_bridge_port | string) in files['walle.kubeconfig']"
+          # The token is held by kubectl proxy, read-only, on a socket of group walle.
+          - "'User=walle-kube' in files['walle-kube.service']"
+          - "'Group=walle' in files['walle-kube.service']"
+          - "'LoadCredential=kubeconfig:' + walle_kubeconfig_dir + '/kubeconfig' in files['walle-kube.service']"
+          - "'--unix-socket=' + walle_kube_socket_dir + '/api.sock' in files['walle-kube.service']"
+          - "'--reject-methods=^(POST|PUT|PATCH|DELETE|CONNECT)$$' in files['walle-kube.service']"
+          - "'UMask=0007' in files['walle-kube.service']"
+          - "'RuntimeDirectoryMode=0750' in files['walle-kube.service']"
+          # The bridge serves user walle only and has no token.
+          - "'WALLE_KUBE_USERS=walle' in files['walle-kube-bridge.service']"
+          - "'DynamicUser=true' in files['walle-kube-bridge.service']"
+          - "'Credential' not in files['walle-kube-bridge.service']"
+          - "'IPAddressAllow=localhost' in files['walle-kube-bridge.service']"
+          # The web proxy reaches any public host but no internal network, and
+          # screens for the token it reads itself (no allowlist any more).
+          - "'IPAddressDeny=0.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10' in files['walle-fetch.service']"
           - "'DynamicUser=true' in files['walle-fetch.service']"
+          - "'LoadCredential=kubeconfig:' + walle_kubeconfig_dir + '/kubeconfig' in files['walle-fetch.service']"
+          - "'SetCredential=kubeconfig:none' in files['walle-fetch.service']"
+          - "'WALLE_FETCH_SECRET_FILES=%d/kubeconfig' in files['walle-fetch.service']"
+          - "'WALLE_FETCH_ALLOW' not in files['walle-fetch.service']"
           # Each side trusts the other's repositories, and only those.
           - "'directory = /srv/walle/work/homelab' in files['operator.gitconfig']"
           - "'directory = /srv/walle/repos/homelab' in files['walle.gitconfig']"
@@ -77,7 +114,12 @@
       changed_when: false
       failed_when: status.rc != 0 or (status.stdout != "" and "WALL-E" not in status.stdout)
 
-    - name: The web proxy's URL checks pass their unit tests
+    - name: The web proxy's URL checks and screening pass their unit tests
       ansible.builtin.command:
-        cmd: python3 {{ playbook_dir }}/../roles/walle/files/test_walle_fetch.py
+        cmd: python3 -B {{ playbook_dir }}/../roles/walle/files/test_walle_fetch.py
+      changed_when: false
+
+    - name: The cluster bridge passes its unit tests (serves only the allowed user)
+      ansible.builtin.command:
+        cmd: python3 -B {{ playbook_dir }}/../roles/walle/files/test_walle_kube_bridge.py
       changed_when: false

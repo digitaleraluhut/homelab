@@ -1,0 +1,43 @@
+# {{ ansible_managed }}
+# kubectl cannot use a unix socket as its server, so this bridge serves the
+# socket of walle-kube.service on 127.0.0.1:{{ walle_kube_bridge_port }} - but only to connections
+# owned by user {{ walle_user }} (checked in /proc/net/tcp); everyone else is cut off.
+[Unit]
+Description=WALL-E cluster access (localhost bridge, user {{ walle_user }} only)
+After=walle-kube.service
+Wants=walle-kube.service
+
+[Service]
+DynamicUser=true
+SupplementaryGroups={{ walle_user }}
+Environment=WALLE_KUBE_BRIDGE_PORT={{ walle_kube_bridge_port }}
+Environment=WALLE_KUBE_SOCKET={{ walle_kube_socket_dir }}/api.sock
+Environment=WALLE_KUBE_USERS={{ walle_user }}
+ExecStart=/usr/bin/python3 /usr/local/lib/walle/walle-kube-bridge.py
+Restart=on-failure
+RestartSec=10
+
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+NoNewPrivileges=true
+CapabilityBoundingSet=
+RestrictSUIDSGID=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictNamespaces=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax=128M
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target

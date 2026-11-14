@@ -33,13 +33,38 @@
   loop_control:
     label: "{{ item.key }}"
 
+# Holds WALL-E's kube token: only systemd (root) reads it and hands it to
+# walle-kube.service and walle-fetch.service as a credential. WALL-E and the
+# operator (group walle) cannot read it.
+- name: Create the user of the cluster proxy (holds the token at run time)
+  ansible.builtin.user:
+    name: "{{ walle_kube_user }}"
+    comment: WALL-E cluster proxy,,,
+    system: true
+    shell: /usr/sbin/nologin
+    home: /nonexistent
+    create_home: false
+
 - name: Create the kubeconfig directory (file placed by the owner)
   ansible.builtin.file:
     path: "{{ walle_kubeconfig_dir }}"
     state: directory
     owner: root
-    group: "{{ walle_user }}"
-    mode: "0750"
+    group: root
+    mode: "0700"
+
+- name: Look for the kubeconfig
+  ansible.builtin.stat:
+    path: "{{ walle_kubeconfig_dir }}/kubeconfig"
+  register: walle_kubeconfig_file
+
+- name: Keep the kubeconfig readable by root only
+  ansible.builtin.file:
+    path: "{{ walle_kubeconfig_dir }}/kubeconfig"
+    owner: root
+    group: root
+    mode: "0600"
+  when: walle_kubeconfig_file.stat.exists
 
 - name: Create WALL-E's home (state, pi config, sessions)
   ansible.builtin.file:
@@ -84,6 +109,23 @@
     mode: "0755"
   notify: Restart walle-fetch
 
+- name: Install the cluster bridge
+  ansible.builtin.copy:
+    src: walle-kube-bridge.py
+    dest: /usr/local/lib/walle/walle-kube-bridge.py
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart walle-kube-bridge
+
+- name: Install WALL-E's kubeconfig (no token; points at the bridge)
+  ansible.builtin.template:
+    src: walle-kubeconfig.j2
+    dest: "{{ walle_kube_kubeconfig }}"
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Install the units
   ansible.builtin.template:
     src: "{{ item }}.j2"
@@ -91,8 +133,19 @@
     owner: root
     group: root
     mode: "0644"
-  loop: [walle.service, walle-review.service, walle-review.path, walle-mirrors.service, walle-mirrors.timer, walle-fetch.service]
+  loop: [walle.service, walle-review.service, walle-review.path, walle-mirrors.service, walle-mirrors.timer]
   notify: Reload systemd
+
+# The services WALL-E reaches the world through restart on change.
+- name: Install the units of the web proxy and the cluster access
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [walle-fetch.service, walle-kube.service, walle-kube-bridge.service]
+  notify: "Restart {{ item | replace('.service', '') }}"
 
 - name: Flush handlers before switching units
   ansible.builtin.meta: flush_handlers
@@ -118,10 +171,19 @@
     enabled: true
     state: started
 
-# Web access is harmless to keep on (GET only, allowlisted); WALL-E reaches it
+# Web access is harmless to keep on (GET only, screened); WALL-E reaches it
 # through its tool web_get.
 - name: Keep the web proxy running
   ansible.builtin.systemd_service:
     name: walle-fetch.service
     enabled: true
     state: started
+
+# Read-only cluster access; walle-kube.service is skipped (condition) until the
+# owner has placed the kubeconfig.
+- name: Keep WALL-E's cluster access running
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [walle-kube.service, walle-kube-bridge.service]
