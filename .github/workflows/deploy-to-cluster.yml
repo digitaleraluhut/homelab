@@ -102,6 +102,11 @@ jobs:
   deploy:
     name: pulumi ${{ inputs.pulumi-command }} (${{ inputs.pulumi-stack }})
     runs-on: ubuntu-latest
+    # Deploys take 1-2 minutes (2026-11). Without a limit, a deploy that waits for a pod that never
+    # starts holds the stack's Pulumi lock for GitHub's default of 6 hours (homelab-apps, zitadel,
+    # 2026-11-15); 20 minutes releases it much sooner. A stack still locked after a cancel needs
+    # `pulumi cancel -s <stack>` once.
+    timeout-minutes: 20
     # Resolved in the CALLER's repository: its "production" environment (main only)
     # supplies the secrets. Environment secrets take precedence over secrets passed
     # by the caller, so the caller's `secrets:` map is only a fallback.
