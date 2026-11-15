@@ -45,11 +45,15 @@ time goes to what a small local model cannot do.
 ## Review a request
 
 1. Follow `walle/review/REVIEW.md`. Verify every claim yourself (read-only kubectl, the wiki). Never
-   run its scripts or branch code as yourself; read them.
+   run its scripts or branch code as yourself; read them. For an app, check every container (Jobs,
+   init containers included) against the upstream source, all at once: subcommand, each flag, where
+   configuration is read from, environment names, `securityContext` (pod security `restricted`),
+   Deployment strategy (ReadWriteOnce volume → Recreate); tests must check looked-up facts.
 2. Answer in `/srv/walle/inbox/<id>.json` with the verdict, what is wrong and the evidence, but not the
    fix (principle 4); move the request to `outbox/done/`. Issues and PRs you open from its work carry "Prepared by WALL-E".
 3. Add the entry to `training/progress.md` (verdict, factual errors, revisions, process, craft,
-   lesson) and update the summary counters.
+   lesson) and update the summary counters. When the cause was on your side (task, environment,
+   review), add a row to its "Trainer lessons" table.
 4. Turn each general lesson into data (principle 1), commit with Intent/Key changes, push,
    `bin/deploy`, restart `walle.service` when it is idle.
 5. For a script accepted: copy it into `walle/toolbox/`, commit, deploy.
@@ -65,7 +69,15 @@ sudo systemctl restart walle.service   # runs it now; otherwise the next hourly 
 ```
 
 A task should name the files to read (skill, wiki page) and the expected result, so the outcome can
-be judged without interpretation.
+be judged without interpretation. Every requirement must be buildable with the repo's packages and
+components and every required fact reachable with WALL-E's tools; check that before giving it. To
+start an attempt from scratch, list the earlier branches in `"discard": ["<repo>:<branch>"]`: the
+harness removes them before the run (a sentence in the prompt is not enough).
+
+## Watch quietly
+
+Watch WALL-E's runs with Monitor, but do not report each event to the owner. Write how it performed
+into `training/progress.md`; message the owner only for decisions, blockers or a finished review.
 
 ## Delegate more and more
 

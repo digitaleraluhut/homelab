@@ -101,7 +101,9 @@
     owner: root
     group: root
     mode: "0644"
-    content: "{{ {'permissions': {'allow': aioperator_claude_allow}, 'hooks': aioperator_claude_hooks} | to_nice_json }}\n"
+    # autoMemoryEnabled off: the operator's knowledge lives in the wiki (page `operator`), where the
+    # owner and other sessions can read it, not in Claude's private memory files (owner, 2026-11-15).
+    content: "{{ {'permissions': {'allow': aioperator_claude_allow}, 'hooks': aioperator_claude_hooks, 'autoMemoryEnabled': false} | to_nice_json }}\n"
 
 - name: Create the directory for the operator's helper scripts
   ansible.builtin.file:

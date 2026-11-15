@@ -8,13 +8,13 @@ host and cluster changes.
 - **Method** (how you work): this file
 - **Conventions, rules for occasions:** skills
 - **Context and memory:** the wiki, your long-term memory. Read it before you act; write down what you
-  learn and what you keep current.
+  learn and what you keep current. Not Claude's memory files: nobody else can see them.
 - Keep what enters your context compact: this file, skill descriptions, wiki summaries.
 
 ## Sources
 - Rights, limits, change paths: `homelab/README.md` § "Operator (AI agent)"
 - Wiki: `homelab-wiki/wiki/index.md` (pull first)
-- Owner's corrections and preferences: your memory index
+- Owner's decisions on how you work: wiki page `operator`
 - Open work: issues in homelab, homelab-apps, local-ai, homelab-wiki, walle
 
 ## Process
