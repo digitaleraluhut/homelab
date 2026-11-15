@@ -1,5 +1,6 @@
 import { homelabConfig } from "@mrsimpson/homelab-config";
 import * as k8s from "@pulumi/kubernetes";
+import * as pulumi from "@pulumi/pulumi";
 
 /**
  * traefik-gateway - Gateway API-based HTTP(S) routing with Traefik
@@ -26,13 +27,56 @@ export const traefikNamespace = new k8s.core.v1.Namespace("traefik-gateway-ns", 
   },
 });
 
+// Versions that belong together: Traefik chart 42.2.0 brings Traefik v3.7.16, which needs the
+// Gateway API CRDs v1.5.x (it watches v1 TLSRoute and BackendTLSPolicy, absent from v1.1).
+// Upgrade guide: https://github.com/traefik/traefik-helm-chart#upgrading
+export const traefikChartVersion = "42.2.0";
+export const traefikVersion = "v3.7.16";
+export const gatewayApiVersion = "v1.5.1";
+
+// CRDs are applied by Pulumi, not by Helm: Helm installs a chart's crds/ only on the first install
+// and never upgrades them, and the chart ships no Gateway API CRDs since 40.2.0.
+// patchForce takes over the fields the first Helm install wrote (server-side apply).
+// retainOnDelete: removing this code must never delete the CRDs, and with them every route.
+export const crdTransforms: pulumi.ResourceTransform[] = [
+  (args) => ({
+    props: {
+      ...args.props,
+      metadata: {
+        ...args.props.metadata,
+        annotations: {
+          ...args.props.metadata?.annotations,
+          "pulumi.com/patchForce": "true",
+        },
+      },
+    },
+    opts: pulumi.mergeOptions(args.opts, { retainOnDelete: true }),
+  }),
+];
+
+export const gatewayApiCrds = new k8s.yaml.v2.ConfigFile(
+  "gateway-api-crds",
+  {
+    file: `https://github.com/kubernetes-sigs/gateway-api/releases/download/${gatewayApiVersion}/standard-install.yaml`,
+  },
+  { transforms: crdTransforms }
+);
+
+export const traefikCrds = new k8s.yaml.v2.ConfigFile(
+  "traefik-crds",
+  {
+    file: `https://raw.githubusercontent.com/traefik/traefik/${traefikVersion}/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml`,
+  },
+  { transforms: crdTransforms }
+);
+
 // Install Traefik via Helm with Gateway API support
 // Use explicit namespace string with explicit dependsOn to ensure namespace is created first
 export const traefik = new k8s.helm.v3.Release(
   "traefik",
   {
     chart: "traefik",
-    version: "32.1.0", // Latest stable with Gateway API v1.4.0 support
+    version: traefikChartVersion,
     namespace: "traefik-system", // Use string directly, dependsOn ensures it exists
     repositoryOpts: {
       repo: "https://traefik.github.io/charts",
@@ -51,7 +95,9 @@ export const traefik = new k8s.helm.v3.Release(
       },
       // Match k3s + hostPort pattern like ingress-nginx
       service: {
-        type: "ClusterIP", // Not LoadBalancer (we're on bare metal)
+        spec: {
+          type: "ClusterIP", // Not LoadBalancer (we're on bare metal; k3s runs without servicelb)
+        },
         // CRITICAL: Ensure service selector works with Helm-generated labels
         // This addresses the service endpoint resolution issue from PATCHES_APPLIED.md
         annotations: {
@@ -73,8 +119,10 @@ export const traefik = new k8s.helm.v3.Release(
         websecure: {
           port: 8443, // Traefik's default internal container port for TLS
           protocol: "TCP",
-          tls: {
-            enabled: true,
+          http: {
+            tls: {
+              enabled: true,
+            },
           },
         },
       },
@@ -96,11 +144,15 @@ export const traefik = new k8s.helm.v3.Release(
         },
       },
       // Global configuration
-      globalArguments: ["--global.checknewversion=false", "--global.sendanonymoususage=false"],
+      global: {
+        checkNewVersion: false,
+        sendAnonymousUsage: false,
+      },
     },
   },
   {
-    dependsOn: [traefikNamespace], // CRITICAL: Explicit dependency on namespace resource
+    // CRITICAL: namespace first; CRDs before the new Traefik starts
+    dependsOn: [traefikNamespace, gatewayApiCrds, traefikCrds],
   }
 );
 
