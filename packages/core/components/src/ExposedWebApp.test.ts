@@ -22,7 +22,7 @@ beforeAll(async () => {
     "test",
     false
   );
-  const { ExposedWebApp } = await import("./ExposedWebApp");
+  const { ExposedWebApp, AuthType } = await import("./ExposedWebApp");
   new ExposedWebApp("demo", {
     image: "nginxinc/nginx-unprivileged:alpine",
     domain: "demo.example.org",
@@ -34,6 +34,25 @@ beforeAll(async () => {
     domain: "single-writer.example.org",
     port: 8080,
     strategy: "Recreate",
+  });
+  new ExposedWebApp("grpc", {
+    image: "ghcr.io/zitadel/zitadel:v4.20.3",
+    domain: "grpc.example.org",
+    port: 8080,
+    backendProtocol: "h2c",
+  });
+  new ExposedWebApp("grpc-oauth", {
+    image: "ghcr.io/zitadel/zitadel:v4.20.3",
+    domain: "grpc-oauth.example.org",
+    port: 8080,
+    auth: AuthType.OAUTH2_PROXY,
+    backendProtocol: "h2c",
+  });
+  new ExposedWebApp("plain-oauth", {
+    image: "nginxinc/nginx-unprivileged:alpine",
+    domain: "plain-oauth.example.org",
+    port: 8080,
+    auth: AuthType.OAUTH2_PROXY,
   });
   await new Promise((r) => setTimeout(r, 200));
 });
@@ -71,5 +90,46 @@ describe("ExposedWebApp deployment strategy", () => {
     // Apps whose data volume is ReadWriteOnce or that lock files in it (e.g. Gitea's queue
     // database) cannot run two pods at once during a rollout.
     expect(spec("single-writer")?.strategy).toEqual({ type: "Recreate" });
+  });
+});
+
+describe("ExposedWebApp backend protocol", () => {
+  type Port = { name: string; port: number; appProtocol?: string };
+  const servicePorts = (name: string) =>
+    (
+      created.find((c) => c.type === "kubernetes:core/v1:Service" && c.name === `${name}-service`)
+        ?.inputs.spec as { ports: Port[] }
+    ).ports;
+  type Route = { services: Array<{ port: number; scheme?: string }> };
+  const appRouteServices = (name: string) =>
+    (
+      created.find((c) => c.name === `${name}-oauth2-app-route`)?.inputs.spec as {
+        routes: Route[];
+      }
+    ).routes[0].services;
+
+  it("leaves the Service and IngressRoute unchanged unless asked", () => {
+    expect(servicePorts("demo")).toEqual([
+      { port: 80, targetPort: 8080, protocol: "TCP", name: "http" },
+    ]);
+    expect(appRouteServices("plain-oauth")[0]).not.toHaveProperty("scheme");
+  });
+
+  it("marks the Service port as h2c, which Traefik's Gateway API provider reads for HTTPRoutes", () => {
+    // Apps like Zitadel need HTTP/2 between proxy and pod (gRPC).
+    expect(servicePorts("grpc")).toEqual([
+      {
+        port: 80,
+        targetPort: 8080,
+        protocol: "TCP",
+        name: "http",
+        appProtocol: "kubernetes.io/h2c",
+      },
+    ]);
+  });
+
+  it("sets scheme h2c on the app's IngressRoute service (OAuth2-Proxy)", () => {
+    expect(servicePorts("grpc-oauth")[0].appProtocol).toBe("kubernetes.io/h2c");
+    expect(appRouteServices("grpc-oauth")[0].scheme).toBe("h2c");
   });
 });

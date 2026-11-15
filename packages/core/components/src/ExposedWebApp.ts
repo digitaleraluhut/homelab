@@ -158,6 +158,14 @@ export interface ExposedWebAppArgs {
    * lock in it (Gitea's queue database fails with "unable to lock level db" during a rollout).
    */
   strategy?: "RollingUpdate" | "Recreate";
+  /**
+   * Protocol between Traefik and the pod. Default `"http"` (HTTP/1.1).
+   * `"h2c"` (HTTP/2 without TLS) is for apps that need HTTP/2 to the backend, e.g. gRPC or
+   * Zitadel (gRPC APIs, zitadel.com/docs/self-hosting/manage/http2). It sets `appProtocol: kubernetes.io/h2c` on the
+   * Service port (read by Traefik's Gateway API provider for HTTPRoutes, from Traefik v3.2) and
+   * `scheme: h2c` on the app's IngressRoute service (OAuth2-Proxy mode).
+   */
+  backendProtocol?: "http" | "h2c";
   /** Override the container entrypoint (maps to K8s container.command) */
   command?: string[];
   /** Container arguments (maps to K8s container.args) */
@@ -573,6 +581,7 @@ export class ExposedWebApp extends pulumi.ComponentResource {
     );
 
     // Create Service
+    const h2c = args.backendProtocol === "h2c";
     this.service = new k8s.core.v1.Service(
       `${name}-service`,
       {
@@ -591,6 +600,7 @@ export class ExposedWebApp extends pulumi.ComponentResource {
               targetPort: args.port,
               protocol: "TCP",
               name: "http",
+              ...(h2c ? { appProtocol: "kubernetes.io/h2c" } : {}),
             },
           ],
         },
@@ -748,6 +758,7 @@ export class ExposedWebApp extends pulumi.ComponentResource {
                   {
                     name: this.service.metadata.name,
                     port: 80,
+                    ...(h2c ? { scheme: "h2c" } : {}),
                   },
                 ],
                 priority: 1, // Lower priority than /oauth2/* route
