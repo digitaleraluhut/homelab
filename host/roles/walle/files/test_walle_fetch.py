@@ -7,6 +7,7 @@ credential to gitleaks.
 import base64
 import importlib.util
 import io
+import json
 import pathlib
 import random
 import socket
@@ -333,6 +334,158 @@ class LogLine(unittest.TestCase):
         host = rand(40, string.ascii_lowercase + "234567")
         line = wf.screened_log_line(f"https://{host}.evil.example/", "high-entropy", wf.Screen([]))
         self.assertNotIn(host, line)
+
+
+# --- Digest lookup (GET /digest?image=...) ------------------------------------------
+
+DIGEST = "sha256:" + "4b7ce07a4f2ab4f4a6d3a5e6c4f6b4b1e3c2d1a0f9e8d7c6b5a4f3e2d1c0b9a8"
+INDEX = "application/vnd.oci.image.index.v1+json"
+
+
+class Head:
+    """A manifest HEAD response."""
+
+    def __init__(self, digest=DIGEST, ctype=INDEX, status=200):
+        self.status, self.headers = status, {"Docker-Content-Digest": digest, "Content-Type": ctype}
+
+    def read(self, n=-1):
+        return b""
+
+
+def http_error(url, code):
+    return urllib.error.HTTPError(url, code, "error", {}, io.BytesIO(b""))
+
+
+class ParseImage(unittest.TestCase):
+    def test_ghcr_and_docker_hub_images(self):
+        self.assertEqual(wf.parse_image("ghcr.io/zitadel/zitadel:v4.20.3"), ("ghcr.io", "zitadel/zitadel", "v4.20.3"))
+        self.assertEqual(wf.parse_image("docker.io/library/nginx:latest"), ("docker.io", "library/nginx", "latest"))
+        self.assertEqual(wf.parse_image("docker.io/gitea/gitea:1.24.5-rootless"), ("docker.io", "gitea/gitea", "1.24.5-rootless"))
+        self.assertEqual(wf.parse_image("ghcr.io/cloudnative-pg/postgresql:17.6_system-trixie"),
+                         ("ghcr.io", "cloudnative-pg/postgresql", "17.6_system-trixie"))
+
+    def test_official_docker_hub_images_get_the_library_prefix(self):
+        self.assertEqual(wf.parse_image("docker.io/nginx:1.27-alpine"), ("docker.io", "library/nginx", "1.27-alpine"))
+
+    def test_invalid_or_other_images_are_refused(self):
+        for image in [
+            "", "nginx:latest", "nginx", "ghcr.io/zitadel/zitadel", "ghcr.io/zitadel/zitadel:",
+            "quay.io/prometheus/node-exporter:v1.9.1", "evil.example/a/b:latest", "localhost:5000/a:b",
+            "registry-1.docker.io/library/nginx:latest", "ghcr.io:443/zitadel/zitadel:v1",
+            "user@ghcr.io/zitadel/zitadel:v1", "https://ghcr.io/zitadel/zitadel:v1",
+            "ghcr.io/Zitadel/zitadel:v1", "ghcr.io/zitadel//zitadel:v1", "ghcr.io/zitadel/../x:v1",
+            "ghcr.io/zitadel/zitadel:v1?x=1", "ghcr.io/zitadel/zitadel:v1#x", "ghcr.io/zitadel/zitadel:v 1",
+            "ghcr.io/zitadel/zitadel:v1\n", "ghcr.io/zitadel/zitadel%2fx:v1", "ghcr.io/zitadel/zitadel:.v1",
+            "ghcr.io/zitadel/zitadel@" + DIGEST, "ghcr.io/zitadel/zitadel:v1@" + DIGEST,
+            "ghcr.io/" + "a" * 200 + ":v1", "ghcr.io/zitadel/zitadel:" + "1" * 129,
+            "ghcr.io/a/b/c/d/e/f/g:v1",
+        ]:
+            with self.assertRaises(ValueError, msg=image):
+                wf.parse_image(image)
+
+
+class LookupDigest(unittest.TestCase):
+    def setUp(self):
+        self.calls = []
+        self.token = rand(40)
+
+    def open_fn(self, responses):
+        def _open(url, addr, method, hdrs):
+            self.calls.append((url, addr, method, hdrs))
+            r = responses.pop(0)
+            if isinstance(r, Exception):
+                raise r
+            return r
+
+        return _open
+
+    def token_response(self, key="token"):
+        return Response(body=('{"%s": "%s"}' % (key, self.token)).encode(), ctype="application/json")
+
+    def test_ghcr_fetches_an_anonymous_token_then_heads_the_manifest(self):
+        r = wf.lookup_digest("ghcr.io/zitadel/zitadel:v4.20.3", wf.Screen([]), resolve=resolver("140.82.1.1"),
+                             open_fn=self.open_fn([self.token_response(), Head()]))
+        self.assertEqual(r, {"image": "ghcr.io/zitadel/zitadel:v4.20.3", "digest": DIGEST, "mediaType": INDEX,
+                             "pinned": "ghcr.io/zitadel/zitadel:v4.20.3@" + DIGEST})
+        (turl, taddr, tmethod, thdrs), (murl, maddr, mmethod, mhdrs) = self.calls
+        self.assertEqual((turl, taddr, tmethod), ("https://ghcr.io/token?scope=repository:zitadel/zitadel:pull", "140.82.1.1", "GET"))
+        self.assertNotIn("Authorization", thdrs)
+        self.assertEqual((murl, mmethod), ("https://ghcr.io/v2/zitadel/zitadel/manifests/v4.20.3", "HEAD"))
+        self.assertEqual(mhdrs["Authorization"], "Bearer " + self.token)
+        for media in ("application/vnd.oci.image.index.v1+json", "application/vnd.docker.distribution.manifest.list.v2+json",
+                      "application/vnd.docker.distribution.manifest.v2+json", "application/vnd.oci.image.manifest.v1+json"):
+            self.assertIn(media, mhdrs["Accept"])
+        self.assertNotIn(self.token, str(r))
+
+    def test_docker_hub_uses_its_auth_service_and_registry_host(self):
+        r = wf.lookup_digest("docker.io/nginx:latest", wf.Screen([]), resolve=resolver("104.16.1.1"),
+                             open_fn=self.open_fn([self.token_response("access_token"), Head()]))
+        self.assertEqual(r["pinned"], "docker.io/library/nginx:latest@" + DIGEST)
+        self.assertEqual(self.calls[0][0], "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/nginx:pull")
+        self.assertEqual(self.calls[1][0], "https://registry-1.docker.io/v2/library/nginx/manifests/latest")
+
+    def test_registry_hosts_must_resolve_to_public_addresses(self):
+        with self.assertRaises(ValueError) as cm:
+            wf.lookup_digest("ghcr.io/zitadel/zitadel:v1", wf.Screen([]), resolve=resolver("10.0.0.5"),
+                             open_fn=self.open_fn([]))
+        self.assertIn("non-public", str(cm.exception))
+        self.assertEqual(self.calls, [])
+
+    def test_a_screened_image_is_not_requested(self):
+        secret = fake_token()
+        for image, screen in ((f"ghcr.io/{rand(40, string.ascii_lowercase + string.digits)}/x:v1", wf.Screen([])),
+                              ("ghcr.io/x/" + secret[40:70].lower().replace("_", "a").replace("-", "b") + ":v1", wf.Screen([secret]))):
+            with self.assertRaises(wf.Screened, msg=image):
+                wf.lookup_digest(image, screen, resolve=resolver("140.82.1.1"), open_fn=self.open_fn([]))
+        self.assertEqual(self.calls, [])
+
+    def test_registry_errors_are_reported_without_the_token(self):
+        for err in (http_error("https://ghcr.io/v2/x/y/manifests/v1", 404), http_error("https://ghcr.io/v2/x/y/manifests/v1", 401)):
+            with self.assertRaises(ValueError) as cm:
+                wf.lookup_digest("ghcr.io/x/y:v1", wf.Screen([]), resolve=resolver("140.82.1.1"),
+                                 open_fn=self.open_fn([self.token_response(), err]))
+            self.assertIn(str(err.code), str(cm.exception))
+            self.assertNotIn(self.token, str(cm.exception))
+
+    def test_a_missing_token_or_a_malformed_digest_is_refused(self):
+        bad = [
+            [Response(body=b"not json")],
+            [Response(body=b'{"token": "a b\\r\\nX-Evil: 1"}')],
+            [self.token_response(), Head(digest="sha256:short")],
+            [self.token_response(), Head(digest="sha256:" + "A" * 64)],
+            [self.token_response(), Head(digest=DIGEST, ctype="text/html; <script>")],
+        ]
+        for responses in bad:
+            with self.assertRaises(ValueError, msg=responses):
+                wf.lookup_digest("ghcr.io/x/y:v1", wf.Screen([]), resolve=resolver("140.82.1.1"), open_fn=self.open_fn(responses))
+
+
+class DigestEndpoint(unittest.TestCase):
+    def test_success_is_json_and_logged_without_the_token(self):
+        status, body, log = wf.digest_endpoint("ghcr.io/x/y:v1", wf.Screen([]),
+                                               lookup=lambda image, screen: {"image": image, "digest": DIGEST})
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["digest"], DIGEST)
+        self.assertTrue(log.startswith("digest ghcr.io/x/y:v1 -> " + DIGEST), log)
+
+    def test_refusals(self):
+        status, body, log = wf.digest_endpoint("quay.io/x/y:v1", wf.Screen([]))
+        self.assertEqual(status, 403)
+        self.assertIn("ghcr.io", body.decode())
+        self.assertTrue(log.startswith("digest DENIED"), log)
+
+    def test_screened_images_are_not_logged(self):
+        secret = rand(40, string.ascii_lowercase + string.digits)
+        status, _, log = wf.digest_endpoint(f"ghcr.io/{secret}/x:v1", wf.Screen([]))
+        self.assertEqual(status, 403)
+        self.assertTrue(log.startswith("digest SCREENED"), log)
+        self.assertNotIn(secret, log)
+
+    def test_upstream_failures_are_502(self):
+        def fail(image, screen):
+            raise OSError("timed out")
+
+        self.assertEqual(wf.digest_endpoint("ghcr.io/x/y:v1", wf.Screen([]), lookup=fail)[0], 502)
 
 
 if __name__ == "__main__":

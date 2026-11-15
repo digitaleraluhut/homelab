@@ -25,12 +25,22 @@ logged as "fetch SCREENED" without the URL's path or query.
 Addresses: the host is resolved once, every address must be public, and the
 connection goes to the checked address (no second lookup to rebind).
 
+One more fixed endpoint: the digest of a container image, so WALL-E can pin
+images. Registries want an anonymous pull token as an Authorization header,
+which the URL proxy never sends; this endpoint fetches that token itself, from
+registry hosts fixed in code, and returns only the digest (never the token):
+
+    GET http://127.0.0.1:<port>/digest?image=ghcr.io/<repo>:<tag>
+    GET http://127.0.0.1:<port>/digest?image=docker.io/<repo>:<tag>   (docker.io/nginx = library/nginx)
+    -> {"image", "digest", "mediaType", "pinned"} as JSON
+
 Configuration (environment): WALLE_FETCH_PORT; WALLE_FETCH_SECRET_FILES
 (space-separated files with secrets to screen for: kubeconfigs or token files).
 """
 
 import base64
 import collections
+import json
 import http.client
 import http.server
 import ipaddress
@@ -68,6 +78,33 @@ SECRET_KEYS = re.compile(
 RUN = re.compile(r"[A-Za-z0-9+/_=-]+")
 ALNUM = re.compile(r"[A-Za-z0-9]+")
 HEX = re.compile(r"[0-9a-fA-F]+")
+
+
+# Digest lookup: registries fixed in code (proposal: the two WALL-E needs now).
+REGISTRIES = {
+    "ghcr.io": {
+        "token": "https://ghcr.io/token?scope=repository:{repo}:pull",
+        "api": "https://ghcr.io",
+    },
+    "docker.io": {
+        "token": "https://auth.docker.io/token?service=registry.docker.io&scope=repository:{repo}:pull",
+        "api": "https://registry-1.docker.io",
+    },
+}
+MANIFEST_TYPES = ", ".join([
+    "application/vnd.oci.image.index.v1+json",
+    "application/vnd.docker.distribution.manifest.list.v2+json",
+    "application/vnd.docker.distribution.manifest.v2+json",
+    "application/vnd.oci.image.manifest.v1+json",
+])
+MAX_REPO = 128
+MAX_PATH_COMPONENTS = 5
+MAX_TOKEN_BYTES = 16 * 1024
+REPO_COMPONENT = re.compile(r"[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*")  # OCI distribution spec
+TAG = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]{0,127}")  # OCI distribution spec
+TOKEN = re.compile(r"[A-Za-z0-9._~+/=-]{1,%d}" % MAX_TOKEN_BYTES)
+DIGEST_RE = re.compile(r"sha256:[0-9a-f]{64}")
+MEDIA_TYPE = re.compile(r"application/vnd\.[a-z0-9.+-]{1,100}")
 
 
 class Screened(ValueError):
@@ -286,9 +323,13 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def open_pinned(url: str, addr: str, accept: str):
+def request_pinned(url: str, addr: str, method: str, hdrs: dict[str, str]):
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect, _PinnedHandler(addr))
-    return opener.open(urllib.request.Request(url, method="GET", headers=headers(accept)), timeout=TIMEOUT)
+    return opener.open(urllib.request.Request(url, method=method, headers=hdrs), timeout=TIMEOUT)
+
+
+def open_pinned(url: str, addr: str, accept: str):
+    return request_pinned(url, addr, "GET", headers(accept))
 
 
 def fetch(url: str, accept: str, screen: Screen, resolve=socket.getaddrinfo, open_fn=open_pinned):
@@ -315,6 +356,74 @@ def fetch(url: str, accept: str, screen: Screen, resolve=socket.getaddrinfo, ope
     raise ValueError("too many redirects")
 
 
+# --- Digest lookup ----------------------------------------------------------------
+
+
+def parse_image(image: str) -> tuple[str, str, str]:
+    """(registry, repo, tag) of "<registry>/<repo>:<tag>"; ValueError unless strictly valid."""
+    registry, _, rest = image.partition("/")
+    if registry not in REGISTRIES:
+        raise ValueError(f"only images on {' or '.join(REGISTRIES)}, as <registry>/<repo>:<tag>")
+    repo, sep, tag = rest.rpartition(":")
+    if not sep or not TAG.fullmatch(tag):
+        raise ValueError("a tag is required: letters, digits, . _ - (at most 128, not starting with . or -)")
+    parts = repo.split("/")
+    if len(repo) > MAX_REPO or len(parts) > MAX_PATH_COMPONENTS or not all(REPO_COMPONENT.fullmatch(p) for p in parts):
+        raise ValueError(f"invalid repository name (lowercase letters, digits, . _ -, at most {MAX_REPO} characters)")
+    if registry == "docker.io" and len(parts) == 1:
+        repo = "library/" + repo
+    return registry, repo, tag
+
+
+def _registry_call(url: str, method: str, hdrs: dict[str, str], what: str, resolve, open_fn):
+    addrs = public_addresses(urllib.parse.urlsplit(url).hostname, resolve)
+    try:
+        return open_fn(url, addrs[0], method, {"User-Agent": USER_AGENT, **hdrs})
+    except urllib.error.HTTPError as e:  # its message carries no request headers
+        raise ValueError(f"{what}: registry answered {e.code}") from None
+
+
+def lookup_digest(image: str, screen: Screen, resolve=socket.getaddrinfo, open_fn=request_pinned) -> dict:
+    """Digest and media type of an image's manifest (index if multi-arch); the token stays inside."""
+    reason = screen.text(image)
+    if reason:
+        raise Screened(reason)
+    registry, repo, tag = parse_image(image)
+    reg = REGISTRIES[registry]
+    resp = _registry_call(reg["token"].format(repo=repo), "GET", {"Accept": "application/json"}, "token", resolve, open_fn)
+    try:
+        data = json.loads(resp.read(MAX_TOKEN_BYTES + 1))
+        token = data.get("token") or data.get("access_token")
+    except (ValueError, AttributeError):
+        token = None
+    if not isinstance(token, str) or not TOKEN.fullmatch(token):
+        raise ValueError("token: the registry sent no usable anonymous token")
+    resp = _registry_call(f"{reg['api']}/v2/{repo}/manifests/{tag}", "HEAD",
+                          {"Accept": MANIFEST_TYPES, "Authorization": "Bearer " + token}, "manifest", resolve, open_fn)
+    digest = resp.headers.get("Docker-Content-Digest") or ""
+    media = (resp.headers.get("Content-Type") or "").split(";")[0].strip()
+    if not DIGEST_RE.fullmatch(digest):
+        raise ValueError("manifest: no sha256 digest in the registry's answer")
+    if not MEDIA_TYPE.fullmatch(media):
+        raise ValueError("manifest: unexpected media type in the registry's answer")
+    name = f"{registry}/{repo}:{tag}"
+    return {"image": name, "digest": digest, "mediaType": media, "pinned": f"{name}@{digest}"}
+
+
+def digest_endpoint(image: str, screen: Screen, lookup=lookup_digest) -> tuple[int, bytes, str]:
+    """(status, body, log line) for GET /digest?image=..."""
+    try:
+        result = lookup(image, screen)
+    except Screened as e:
+        return 403, f"walle-fetch: refused, the request looks like it carries a credential ({e})\n".encode(), \
+            f"digest SCREENED [{len(image)} characters withheld] : {e}"
+    except ValueError as e:
+        return 403, f"walle-fetch: {e}\n".encode(), f"digest DENIED {image[:200]!r} : {e}"
+    except OSError as e:
+        return 502, f"walle-fetch: {e}\n".encode(), f"digest FAILED {image[:200]!r} : {e}"
+    return 200, (json.dumps(result) + "\n").encode(), f"digest {result['image']} -> {result['digest']}"
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     screen = Screen([])
 
@@ -325,7 +434,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(msg.encode())
 
     def do_GET(self):
-        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        parts = urllib.parse.urlsplit(self.path)
+        q = urllib.parse.parse_qs(parts.query)
+        if parts.path == "/digest":
+            return self._digest((q.get("image") or [""])[0])
         url = (q.get("url") or [""])[0]
         try:
             accept = clean_accept(self.headers.get("Accept", "*/*"), self.screen)
@@ -343,6 +455,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("X-Final-Url", final)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _digest(self, image: str):
+        status, body, log = digest_endpoint(image, self.screen)
+        print(log, flush=True)
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json" if status == 200 else "text/plain; charset=utf-8")
         self.end_headers()
         self.wfile.write(body)
 
