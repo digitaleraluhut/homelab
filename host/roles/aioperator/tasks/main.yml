@@ -184,3 +184,6 @@
 
 - name: Install the repository's skills
   ansible.builtin.include_tasks: repo-skills.yml
+
+- name: Link the skills for Claude Code and remove its memory files
+  ansible.builtin.include_tasks: claude-skill-links.yml

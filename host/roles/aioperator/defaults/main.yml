@@ -68,9 +68,13 @@ aioperator_skills:
 # that the runner applies. They do not depend on the operator's checkouts.
 # Every directory under skills/ with a SKILL.md is installed (tasks/repo-skills.yml).
 aioperator_repo_skills_src: "{{ playbook_dir }}/../skills"
+# Skills live in ~/.agents/skills only. Claude Code reads ~/.claude/skills and has no setting for
+# another user skill directory, so the role links each skill there (tasks/claude-skill-links.yml);
+# ~/.claude holds configuration and Claude Code's own state, no content of ours (owner, 2026-11-15).
 aioperator_skill_dirs:
   - "{{ aioperator_home }}/.agents/skills"
-  - "{{ aioperator_home }}/.claude/skills"
+aioperator_claude_skills_dir: "{{ aioperator_home }}/.claude/skills"
+aioperator_claude_projects_dir: "{{ aioperator_home }}/.claude/projects"
 
 # Claude Code permissions for the operator, as root-owned managed settings the
 # operator cannot change itself. GitHub still enforces code-owner review, so
