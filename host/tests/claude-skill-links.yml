@@ -1,0 +1,48 @@
+---
+# Skills live in the agents' directory; Claude Code's directory gets links only, its own entries
+# stay, old copies are replaced, memory directories are removed.
+# Run: ansible-playbook tests/claude-skill-links.yml -e out=$(mktemp -d)
+- name: Link skills for Claude Code (scratch)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../roles/aioperator/defaults/main.yml
+  tasks:
+    - name: Point everything at the scratch directory
+      ansible.builtin.set_fact:
+        aioperator_user: "{{ lookup('env', 'USER') }}"
+        aioperator_skill_dirs: ["{{ out }}/agents"]
+        aioperator_claude_skills_dir: "{{ out }}/claude/skills"
+        aioperator_claude_projects_dir: "{{ out }}/claude/projects"
+
+    - name: Create a skill, an old copy, Claude's own entry and a memory directory
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ out }}/agents/train-walle"
+        - "{{ out }}/claude/skills/train-walle"
+        - "{{ out }}/claude/skills/synced"
+        - "{{ out }}/claude/projects/-home-x/memory"
+
+    - name: Run the role's tasks (twice, for idempotence)
+      ansible.builtin.include_tasks: ../roles/aioperator/tasks/claude-skill-links.yml
+      loop: [1, 2]
+
+    - name: Inspect the results
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ out }}/claude/skills/train-walle"
+        - "{{ out }}/claude/skills/synced"
+        - "{{ out }}/claude/projects/-home-x/memory"
+      register: results
+
+    - name: Links replace copies, Claude's entries stay, memory is gone
+      ansible.builtin.assert:
+        that:
+          - results.results[0].stat.islnk and results.results[0].stat.lnk_source == out + '/agents/train-walle'
+          - results.results[1].stat.isdir and not results.results[1].stat.islnk
+          - not results.results[2].stat.exists

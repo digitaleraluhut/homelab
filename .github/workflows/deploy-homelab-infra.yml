@@ -44,6 +44,9 @@ jobs:
   deploy:
     name: pulumi up (mrsimpson/homelab/dev)
     runs-on: ubuntu-latest
+    # Infra deploys take 1-2 minutes (2026-11); a hung `pulumi up` would hold the stack's lock
+    # for GitHub's default of 6 hours. 30 minutes leaves room for slow storage or CRD changes.
+    timeout-minutes: 30
     # Secrets live in the "production" environment, which only main may use.
     environment: production
 

@@ -3,6 +3,21 @@
 # Earlier versions symlinked some of them into working checkouts; replace
 # such links first, or the copy would write through them into the checkout.
 
+# Convention instead of a list: every directory under skills/ with a SKILL.md is a skill.
+- name: Find the repository's skills
+  ansible.builtin.find:
+    paths: "{{ aioperator_repo_skills_src }}"
+    patterns: SKILL.md
+    recurse: true
+    depth: 2
+  register: aioperator_repo_skill_files
+
+- name: Name the repository's skills
+  ansible.builtin.set_fact:
+    aioperator_repo_skills: >-
+      {{ aioperator_repo_skill_files.files | map(attribute='path') | map('dirname')
+         | map('basename') | sort }}
+
 - name: Check for old skill symlinks
   ansible.builtin.stat:
     path: "{{ item.0 }}/{{ item.1 }}"

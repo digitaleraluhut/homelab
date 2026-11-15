@@ -13,7 +13,7 @@
     - name: Point everything at the scratch directory
       ansible.builtin.set_fact:
         aioperator_user: "{{ lookup('env', 'USER') }}"
-        aioperator_skill_dirs: ["{{ out }}/agents", "{{ out }}/claude"]
+        aioperator_skill_dirs: ["{{ out }}/agents"]
         aioperator_repo_skills_src: "{{ playbook_dir }}/../../skills"
 
     - name: Create the skill directories and a fake old checkout
@@ -21,7 +21,7 @@
         path: "{{ item }}"
         state: directory
         mode: "0755"
-      loop: ["{{ out }}/agents", "{{ out }}/claude", "{{ out }}/old-checkout/wiki-maintenance"]
+      loop: ["{{ out }}/agents", "{{ out }}/old-checkout/wiki-maintenance"]
 
     - name: Simulate the old symlink into a working checkout
       ansible.builtin.file:
@@ -39,8 +39,9 @@
       loop:
         - "{{ out }}/agents/wiki-maintenance"
         - "{{ out }}/agents/workflow-handoff/SKILL.md"
-        - "{{ out }}/claude/wiki-maintenance/SKILL.md"
+        - "{{ out }}/agents/train-walle/SKILL.md"
         - "{{ out }}/old-checkout/wiki-maintenance/SKILL.md"
+        - "{{ out }}/agents/git-workflow/SKILL.md"
       register: results
 
     - name: Skills are real copies; the old checkout was not written to
@@ -48,5 +49,7 @@
         that:
           - results.results[0].stat.isdir and not results.results[0].stat.islnk
           - results.results[1].stat.exists
+          # A skill is installed because its directory exists, not because it is listed.
+          - results.results[4].stat.exists
           - results.results[2].stat.exists
           - not results.results[3].stat.exists

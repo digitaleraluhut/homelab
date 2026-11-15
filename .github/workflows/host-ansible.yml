@@ -42,26 +42,13 @@ jobs:
       - name: Syntax check
         run: ansible-playbook site.yml --syntax-check
 
-      - name: Render and validate sudoers
-        run: ansible-playbook tests/render-sudoers.yml
-
-      - name: Render GitHub App helpers and derive the git identity
-        run: ansible-playbook tests/github-app.yml -e out="$RUNNER_TEMP/github-app"
-
-      - name: Timeshift excludes (adds missing, idempotent)
-        run: ansible-playbook tests/timeshift-excludes.yml
-
-      - name: gitleaks and hook activation
-        run: ansible-playbook tests/git-hooks.yml -e out="$RUNNER_TEMP/git-hooks" -e ansible_become=false
-
-      - name: Skills copied from skills/
-        run: ansible-playbook tests/repo-skills.yml -e out="$RUNNER_TEMP/repo-skills"
-
-      - name: Workspace instructions (AGENTS.md)
-        run: ansible-playbook tests/workspace-agents.yml -e out="$RUNNER_TEMP/workspace-agents"
-
-      - name: Node.js for the operator
-        run: ansible-playbook tests/node.yml -e out="$RUNNER_TEMP/node"
-
-      - name: WALL-E units and git configs
-        run: ansible-playbook tests/walle.yml -e out="$RUNNER_TEMP/walle"
+      # Every playbook under tests/ runs, by convention instead of a list; each one takes a scratch
+      # directory in `out` and needs no root.
+      - name: Host tests (tests/*.yml)
+        run: |
+          set -euo pipefail
+          for t in tests/*.yml; do
+            echo "::group::$t"
+            ansible-playbook "$t" -e out="$RUNNER_TEMP/$(basename "$t" .yml)" -e ansible_become=false
+            echo "::endgroup::"
+          done
