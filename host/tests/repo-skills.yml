@@ -41,6 +41,7 @@
         - "{{ out }}/agents/workflow-handoff/SKILL.md"
         - "{{ out }}/claude/wiki-maintenance/SKILL.md"
         - "{{ out }}/old-checkout/wiki-maintenance/SKILL.md"
+        - "{{ out }}/claude/git-workflow/SKILL.md"
       register: results
 
     - name: Skills are real copies; the old checkout was not written to
@@ -48,5 +49,7 @@
         that:
           - results.results[0].stat.isdir and not results.results[0].stat.islnk
           - results.results[1].stat.exists
+          # A skill is installed because its directory exists, not because it is listed.
+          - results.results[4].stat.exists
           - results.results[2].stat.exists
           - not results.results[3].stat.exists
