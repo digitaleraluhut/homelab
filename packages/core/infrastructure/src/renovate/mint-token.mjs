@@ -13,6 +13,23 @@ import { pathToFileURL } from "node:url";
 const b64url = (data) => Buffer.from(data).toString("base64url");
 
 /** RS256 JWT for the App: backdated 60 s against clock drift, valid 9 minutes (max is 10). */
+/**
+ * A PEM key whose line breaks got lost on the way (stored as one line with spaces, or with literal
+ * "\\n") is rebuilt: header, base64 body wrapped at 64 characters, footer. The key material is not
+ * changed; a well-formed key is returned as it is.
+ */
+export function normalizePem(key) {
+  const text = key.replace(/\\n/g, "\n").trim();
+  const m = text.match(
+    /^(-----BEGIN [A-Z ]+-----)\s*([A-Za-z0-9+/=\s]+?)\s*(-----END [A-Z ]+-----)$/
+  );
+  if (!m) return key;
+  const body = m[2].replace(/\s+/g, "");
+  const wrapped = body.match(/.{1,64}/g).join("\n");
+  const pem = `${m[1]}\n${wrapped}\n${m[3]}\n`;
+  return pem.trim() === key.trim() ? key : pem;
+}
+
 export function appJwt(appId, privateKey, now = Math.floor(Date.now() / 1000)) {
   const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const payload = b64url(JSON.stringify({ iat: now - 60, exp: now + 540, iss: appId }));
@@ -28,7 +45,7 @@ export function parseConfig(env) {
   };
   const appId = numeric("GITHUB_APP_ID");
   const installationId = numeric("GITHUB_APP_INSTALLATION_ID");
-  const privateKey = env.GITHUB_APP_PRIVATE_KEY ?? "";
+  const privateKey = normalizePem(env.GITHUB_APP_PRIVATE_KEY ?? "");
   if (!privateKey.trim()) throw new Error("GITHUB_APP_PRIVATE_KEY is empty");
   const tokenFile = env.TOKEN_FILE ?? "";
   if (!tokenFile) throw new Error("TOKEN_FILE is not set");

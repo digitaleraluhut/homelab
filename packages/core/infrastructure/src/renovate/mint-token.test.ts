@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 // @ts-expect-error plain ESM script that runs in the init container, no type declarations
-import { appJwt, main, mintToken, parseConfig, writeToken } from "./mint-token.mjs";
+import { appJwt, main, mintToken, normalizePem, parseConfig, writeToken } from "./mint-token.mjs";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -166,5 +166,33 @@ describe("running as a script", () => {
     // Without configuration main() must run and fail loudly, not exit 0 in silence.
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("Could not mint the GitHub App installation token");
+  });
+});
+
+describe("normalizePem", () => {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: "pkcs1", format: "pem" },
+    publicKeyEncoding: { type: "spki", format: "pem" },
+  });
+  const signs = (key: string) => {
+    const jwt = appJwt("12345", normalizePem(key), 1_700_000_000);
+    const [h, p, s] = jwt.split(".");
+    return createVerify("RSA-SHA256")
+      .update(`${h}.${p}`)
+      .verify(publicKey, Buffer.from(s, "base64url"));
+  };
+
+  it("leaves a well-formed key as it is", () => {
+    expect(normalizePem(privateKey)).toBe(privateKey);
+    expect(signs(privateKey)).toBe(true);
+  });
+
+  it("rebuilds a key whose line breaks became spaces (one line, as stored in ESC)", () => {
+    expect(signs(privateKey.trim().replace(/\n/g, " "))).toBe(true);
+  });
+
+  it("rebuilds a key whose line breaks are literal \\n", () => {
+    expect(signs(privateKey.trim().replace(/\n/g, "\\n"))).toBe(true);
   });
 });
