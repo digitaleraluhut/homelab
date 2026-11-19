@@ -181,6 +181,9 @@ homelab.createExposedWebApp("my-app", {
   // HTTP/2 without TLS (h2c) from Traefik to the pod, e.g. gRPC or Zitadel (see below)
   backendProtocol: "h2c",
 
+  // Path prefixes on the app's host to other Services in the namespace (see below)
+  extraRoutes: [{ pathPrefix: "/ui/v2/login", serviceName: "my-app-login", servicePort: 3000 }],
+
   // Resources
   resources: {
     requests: { cpu: "100m", memory: "128Mi" },
@@ -234,6 +237,35 @@ Some apps need HTTP/2 between the proxy and the pod, for example gRPC services o
 | IngressRoute (`AuthType.OAUTH2_PROXY`) | `scheme: h2c` on the app's IngressRoute service (and the Service's `appProtocol`) | Kubernetes CRD provider (v3.1 too) |
 
 > **Traefik version.** The cluster runs Traefik v3.1.5 (chart 32.1.0, `packages/core/infrastructure/src/traefik-gateway`). Its Gateway API provider ignores `appProtocol` and talks HTTP/1.1 to every HTTPRoute backend. The provider reads `kubernetes.io/h2c` only from Traefik v3.2.0 on (`getProtocol` in `pkg/provider/kubernetes/gateway/httproute.go`). Until Traefik is upgraded, h2c works only with `AuthType.OAUTH2_PROXY`.
+
+## Path prefixes to other services (`extraRoutes`)
+
+Some apps consist of more than one service on one host. Zitadel v4, for example, serves its Login V2 as a separate service at `https://id.<domain>/ui/v2/login`, while everything else on the host goes to the core (the [official chart](https://github.com/zitadel/zitadel-charts/blob/main/charts/zitadel/templates/httproute_login.yaml) does this with an HTTPRoute path prefix). Apps do not create their own routes, so `ExposedWebApp` does it:
+
+```typescript
+// The app creates the second Deployment and Service in its namespace ...
+const loginService = new k8s.core.v1.Service("zitadel-login", { /* port 3000 → the login pod */ });
+
+// ... and the component routes the prefix to it.
+homelab.createExposedWebApp("zitadel", {
+  // ...
+  extraRoutes: [
+    { pathPrefix: "/ui/v2/login", serviceName: loginService.metadata.name, servicePort: 3000 },
+  ],
+});
+```
+
+| | HTTPRoute (`AuthType.NONE`, `AuthType.FORWARD`) | IngressRoute (`AuthType.OAUTH2_PROXY`) |
+|---|---|---|
+| What it adds | one rule per prefix, before the app's `/` rule | one route `Host(...) && PathPrefix(...)` per prefix in the app's IngressRoute |
+| Which wins | the longest `PathPrefix` across rules (Gateway API precedence) | Traefik's default priority, the rule's length: above the catch-all (priority 1), longest prefix first |
+| Auth | the same Authelia filters as the app | the same OAuth2 middleware chain as the app |
+| `backendProtocol: "h2c"` | no effect: Traefik reads `appProtocol: kubernetes.io/h2c` from the Service, which the app sets | `scheme: h2c` on the route's service |
+
+- The extra paths always carry the app's auth: they are on the same host, and a protected app must not get public holes by accident.
+- `pathPrefix` starts with `/`, is not `/` itself (that is the app) and has no wildcards, `//`, `/./` or `/../`; the component refuses anything else.
+- Matching differs in one detail: Gateway API matches whole path segments (`/ui` matches `/ui/x`, not `/uix`), a Traefik `PathPrefix` matches characters. Prefer prefixes that end at a segment boundary in the app anyway.
+- Without `extraRoutes` the routes are unchanged.
 
 ## Troubleshooting
 

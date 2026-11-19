@@ -48,6 +48,11 @@ import * as pulumi from "@pulumi/pulumi";
  * - `serviceAccountName` — set the pod's ServiceAccount (must already exist in the namespace).
  *   Useful when the app needs RBAC permissions (e.g. managing pods via the K8s API).
  *
+ * ### Extra routes (path prefixes to other services)
+ * - `extraRoutes` — send path prefixes on the app's host to other Services in the app's namespace
+ *   (e.g. Zitadel's Login V2 at `/ui/v2/login`). The app creates those Services; the component
+ *   routes to them with the same auth as the app. Apps must not create their own routes.
+ *
  * ### Health probes
  * - `probes.readinessProbe` / `probes.livenessProbe` — standard Kubernetes probe objects
  *   applied to the main app container. Omit to use no probes (Kubernetes default).
@@ -142,6 +147,43 @@ export interface OAuth2ProxyConfig {
   namespace?: string;
 }
 
+/**
+ * A path prefix on the app's host that goes to another Service in the app's namespace.
+ * The app creates the Service; the component only routes to it, with the app's auth.
+ */
+export interface ExtraRoute {
+  /** Path prefix, e.g. `/ui/v2/login`. Starts with `/`, is not `/` itself, no wildcards. */
+  pathPrefix: string;
+  /** Name of the Service, in the app's namespace */
+  serviceName: pulumi.Input<string>;
+  /** Port of the Service */
+  servicePort: number;
+  /**
+   * Protocol between Traefik and that Service. Default `"http"`. `"h2c"` sets `scheme: h2c` on the
+   * IngressRoute service (OAuth2-Proxy mode). For HTTPRoutes Traefik reads the protocol from the
+   * Service itself: the app sets `appProtocol: kubernetes.io/h2c` on its Service port.
+   */
+  backendProtocol?: "http" | "h2c";
+}
+
+/** Refuses path prefixes that would not route as a plain prefix (see {@link ExtraRoute}). */
+function validateExtraRoutes(name: string, routes: ExtraRoute[]): void {
+  for (const { pathPrefix } of routes) {
+    const problem = !pathPrefix.startsWith("/")
+      ? "must start with /"
+      : pathPrefix === "/"
+        ? "must not be / (that is the app itself)"
+        : pathPrefix.includes("*")
+          ? "must not contain wildcards"
+          : /\/\/|\/\.\.?(\/|$)/.test(pathPrefix)
+            ? "must not contain //, /./ or /../"
+            : undefined;
+    if (problem) {
+      throw new Error(`ExposedWebApp ${name}: extraRoutes pathPrefix "${pathPrefix}" ${problem}`);
+    }
+  }
+}
+
 export interface ExposedWebAppArgs {
   /** Container image to deploy */
   image: string | pulumi.Output<string>;
@@ -166,6 +208,12 @@ export interface ExposedWebAppArgs {
    * `scheme: h2c` on the app's IngressRoute service (OAuth2-Proxy mode).
    */
   backendProtocol?: "http" | "h2c";
+  /**
+   * Path prefixes on the app's host that go to other Services in the app's namespace, e.g.
+   * Zitadel's Login V2 at `/ui/v2/login`. Same auth as the app; the longest prefix wins, `/` stays
+   * with the app. Default: none (routes unchanged).
+   */
+  extraRoutes?: ExtraRoute[];
   /** Override the container entrypoint (maps to K8s container.command) */
   command?: string[];
   /** Container arguments (maps to K8s container.args) */
@@ -261,6 +309,8 @@ export class ExposedWebApp extends pulumi.ComponentResource {
   public readonly pvc?: k8s.core.v1.PersistentVolumeClaim;
 
   constructor(name: string, args: ExposedWebAppArgs, opts?: pulumi.ComponentResourceOptions) {
+    const extraRoutes = args.extraRoutes ?? [];
+    validateExtraRoutes(name, extraRoutes);
     super("homelab:ExposedWebApp", name, {}, opts);
 
     const childOpts = { parent: this };
@@ -763,6 +813,26 @@ export class ExposedWebApp extends pulumi.ComponentResource {
                 ],
                 priority: 1, // Lower priority than /oauth2/* route
               },
+              // Extra path prefixes, behind the same chain: they are on the same protected host.
+              // No explicit priority: Traefik's default is the rule's length, always above the
+              // catch-all's 1, and the longest prefix wins among them (as in Gateway API).
+              ...extraRoutes.map((r) => ({
+                match: pulumi.interpolate`Host(\`${args.domain}\`) && PathPrefix(\`${r.pathPrefix}\`)`,
+                kind: "Rule",
+                middlewares: [
+                  {
+                    name: `${name}-oauth2-chain`,
+                    namespace: namespace.metadata.name,
+                  },
+                ],
+                services: [
+                  {
+                    name: r.serviceName,
+                    port: r.servicePort,
+                    ...(r.backendProtocol === "h2c" ? { scheme: "h2c" } : {}),
+                  },
+                ],
+              })),
             ],
           },
         },
@@ -845,6 +915,12 @@ export class ExposedWebApp extends pulumi.ComponentResource {
         ],
         hostnames: [args.domain],
         rules: [
+          // Extra path prefixes first. Gateway API gives precedence to the longest PathPrefix
+          // across rules anyway; list order only breaks ties.
+          ...extraRoutes.map((r) => ({
+            matches: [{ path: { type: "PathPrefix", value: r.pathPrefix } }],
+            backendRefs: [{ name: r.serviceName, port: r.servicePort }],
+          })),
           {
             matches: [
               {
@@ -866,7 +942,8 @@ export class ExposedWebApp extends pulumi.ComponentResource {
 
       // Add ForwardAuth middleware for Authelia authentication
       if (args.auth === AuthType.FORWARD && this.forwardAuthMiddleware) {
-        httpRouteSpec.rules[0].filters = [
+        // Every rule, extra paths included: they are on the same protected host.
+        const filters = [
           {
             type: "RequestHeaderModifier",
             requestHeaderModifier: {
@@ -891,6 +968,9 @@ export class ExposedWebApp extends pulumi.ComponentResource {
             },
           },
         ];
+        for (const rule of httpRouteSpec.rules) {
+          rule.filters = filters;
+        }
       }
 
       // Create Gateway API HTTPRoute
