@@ -48,10 +48,10 @@
     },
     {
       "customType": "regex",
-      "description": "Container images in TS: // renovate: image above image: \"name:tag\"",
+      "description": "Container images in TS: // renovate: image above the line with \"name:tag\" or \"name:tag@sha256:...\"",
       "managerFilePatterns": ["/\\.ts$/"],
       "matchStrings": [
-        "// renovate: image\\s+image: \"(?<depName>[^:\"]+):(?<currentValue>[^\"]+)\""
+        "// renovate: image\\s+[^\"\\n]*\\s*\"(?<depName>[^:\"@]+):(?<currentValue>[^\"@]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?\""
       ],
       "datasourceTemplate": "docker"
     }

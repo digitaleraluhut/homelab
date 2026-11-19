@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import * as k8s from "@pulumi/kubernetes";
 import type * as pulumi from "@pulumi/pulumi";
 
@@ -9,6 +11,11 @@ import type * as pulumi from "@pulumi/pulumi";
  *   renovate-app-private-key. The App itself is created by the owner (see
  *   docs/howto/setup-renovate.md); until the ESC keys exist the ExternalSecret stays
  *   pending and the job fails harmlessly.
+ * - Renovate needs a GitHub App installation token and does not mint it itself
+ *   (https://docs.renovatebot.com/modules/platform/github/#running-as-a-github-app). The init
+ *   container mint-token (mint-token.mjs) mints one per run and writes only the token to an
+ *   in-memory volume; Renovate reads it through its global config file (config.js). The App
+ *   secret is mounted into the init container only.
  * - Renovate's behaviour (schedule of PRs, grouping, release-age windows, auto-merge rules)
  *   lives in renovate.json in each repository, not here. This only runs the bot.
  *
@@ -21,6 +28,18 @@ const LABELS = {
   "app.kubernetes.io/managed-by": "pulumi-homelab",
   "app.kubernetes.io/part-of": "renovate",
 };
+// The bot user of the App `digitaleraluhut-renovate` (docs/howto/setup-renovate.md).
+const APP_USERNAME = "digitaleraluhut-renovate[bot]";
+// One image for both containers: the init container needs only Node, which this image has.
+// renovate: image
+const IMAGE =
+  "renovate/renovate:41.173.1@sha256:e998e1218fe572e23278d8808186a310784f7cb2ac8055307183ffc51d3a59e5";
+// The image's own non-root user (containerbase `ubuntu`); its HOME belongs to it.
+const IMAGE_UID = 12021;
+const TOKEN_DIR = "/run/renovate-token";
+const SCRIPTS_INIT_DIR = "/opt/renovate-token";
+const CONFIG_DIR = "/etc/renovate";
+const readScript = (file: string) => fs.readFileSync(path.join(__dirname, file), "utf8");
 
 export interface RenovateArgs {
   externalSecretsOperator: pulumi.Resource;
@@ -29,7 +48,7 @@ export interface RenovateArgs {
   repositories?: string[];
   /** Cron in the node's time zone. Default 02:30 every night. */
   schedule?: string;
-  /** Pinned Renovate image tag; Renovate bumps its own pin via the custom manager in renovate.json. */
+  /** Renovate image (tag@digest); Renovate bumps the default via the custom manager in renovate.json. */
   image?: string;
 }
 
@@ -44,7 +63,17 @@ export function createRenovate(args: RenovateArgs, opts?: pulumi.ResourceOptions
 
   const ns = new k8s.core.v1.Namespace(
     "renovate-ns",
-    { metadata: { name: NAMESPACE, labels: LABELS } },
+    {
+      metadata: {
+        name: NAMESPACE,
+        labels: {
+          ...LABELS,
+          "pod-security.kubernetes.io/enforce": "restricted",
+          "pod-security.kubernetes.io/audit": "restricted",
+          "pod-security.kubernetes.io/warn": "restricted",
+        },
+      },
+    },
     opts
   );
 
@@ -73,6 +102,25 @@ export function createRenovate(args: RenovateArgs, opts?: pulumi.ResourceOptions
     valueFrom: { secretKeyRef: { name: SECRET_NAME, key } },
   });
 
+  const scripts = new k8s.core.v1.ConfigMap(
+    "renovate-scripts",
+    {
+      metadata: { name: "renovate-scripts", namespace: NAMESPACE, labels: LABELS },
+      data: {
+        "mint-token.mjs": readScript("mint-token.mjs"),
+        "config.js": readScript("config.js"),
+      },
+    },
+    { ...opts, dependsOn: [ns] }
+  );
+
+  const image = args.image ?? IMAGE;
+  const restricted = {
+    allowPrivilegeEscalation: false,
+    privileged: false,
+    capabilities: { drop: ["ALL"] },
+  };
+
   const cronJob = new k8s.batch.v1.CronJob(
     "renovate",
     {
@@ -89,28 +137,62 @@ export function createRenovate(args: RenovateArgs, opts?: pulumi.ResourceOptions
             template: {
               spec: {
                 restartPolicy: "Never",
-                securityContext: { runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000 },
+                securityContext: {
+                  runAsNonRoot: true,
+                  runAsUser: IMAGE_UID,
+                  seccompProfile: { type: "RuntimeDefault" },
+                },
+                volumes: [
+                  { name: "token", emptyDir: { medium: "Memory", sizeLimit: "1Mi" } },
+                  { name: "scripts", configMap: { name: "renovate-scripts", defaultMode: 0o444 } },
+                ],
+                initContainers: [
+                  {
+                    name: "mint-token",
+                    image,
+                    command: ["node", `${SCRIPTS_INIT_DIR}/mint-token.mjs`],
+                    env: [
+                      secretEnv("GITHUB_APP_ID", "app_id"),
+                      secretEnv("GITHUB_APP_INSTALLATION_ID", "installation_id"),
+                      secretEnv("GITHUB_APP_PRIVATE_KEY", "private_key"),
+                      {
+                        name: "GITHUB_REPOSITORIES",
+                        value: repositories.map((r) => r.split("/").pop()).join(","),
+                      },
+                      { name: "TOKEN_FILE", value: `${TOKEN_DIR}/token` },
+                    ],
+                    volumeMounts: [
+                      { name: "token", mountPath: TOKEN_DIR },
+                      { name: "scripts", mountPath: SCRIPTS_INIT_DIR, readOnly: true },
+                    ],
+                    securityContext: { ...restricted, readOnlyRootFilesystem: true },
+                    resources: {
+                      requests: { cpu: "10m", memory: "64Mi" },
+                      limits: { memory: "128Mi" },
+                    },
+                  },
+                ],
                 containers: [
                   {
                     name: "renovate",
-                    // renovate-version: renovate/renovate
-                    image: args.image ?? "renovate/renovate:41",
+                    image,
                     env: [
                       { name: "RENOVATE_PLATFORM", value: "github" },
                       { name: "RENOVATE_AUTODISCOVER", value: "false" },
                       { name: "RENOVATE_REPOSITORIES", value: repositories.join(",") },
-                      // Unverified: built-in GitHub App auth of the Renovate CLI. If the
-                      // CLI does not mint the installation token itself, add an init
-                      // container that does (see docs/howto/setup-renovate.md).
-                      secretEnv("RENOVATE_GITHUB_APP_ID", "app_id"),
-                      secretEnv("RENOVATE_GITHUB_APP_KEY", "private_key"),
-                      secretEnv("RENOVATE_GITHUB_APP_INSTALLATION_ID", "installation_id"),
+                      { name: "RENOVATE_USERNAME", value: APP_USERNAME },
+                      // config.js sets `token` from the file the init container wrote.
+                      { name: "RENOVATE_CONFIG_FILE", value: `${CONFIG_DIR}/config.js` },
+                      { name: "RENOVATE_TOKEN_FILE", value: `${TOKEN_DIR}/token` },
                       { name: "LOG_LEVEL", value: "info" },
                     ],
-                    securityContext: {
-                      allowPrivilegeEscalation: false,
-                      capabilities: { drop: ["ALL"] },
-                    },
+                    volumeMounts: [
+                      { name: "token", mountPath: TOKEN_DIR, readOnly: true },
+                      { name: "scripts", mountPath: CONFIG_DIR, readOnly: true },
+                    ],
+                    // Root filesystem stays writable: Renovate and containerbase write caches
+                    // and tools below HOME and /tmp. Not required by the restricted profile.
+                    securityContext: { ...restricted, readOnlyRootFilesystem: false },
                     resources: {
                       requests: { cpu: "100m", memory: "512Mi" },
                       limits: { memory: "2Gi" },
@@ -123,8 +205,8 @@ export function createRenovate(args: RenovateArgs, opts?: pulumi.ResourceOptions
         },
       },
     },
-    { ...opts, dependsOn: [ns, secret] }
+    { ...opts, dependsOn: [ns, secret, scripts] }
   );
 
-  return { namespace: ns, secret, cronJob };
+  return { namespace: ns, secret, scripts, cronJob };
 }
