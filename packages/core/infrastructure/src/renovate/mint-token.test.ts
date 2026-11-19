@@ -1,5 +1,6 @@
+import { spawnSync } from "node:child_process";
 import { createVerify, generateKeyPairSync } from "node:crypto";
-import { mkdtempSync, readFileSync, statSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, statSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -144,5 +145,26 @@ describe("config.js (Renovate global config)", () => {
       env: { RENOVATE_TOKEN_FILE: file },
     });
     expect(module.exports).toEqual({ token: "ghs_fromfile" });
+  });
+});
+
+describe("running as a script", () => {
+  it("runs main when started through a symlink, as Kubernetes mounts ConfigMap files", () => {
+    // ConfigMap volumes: /scripts/mint-token.mjs -> ..data/mint-token.mjs. Node resolves the symlink for
+    // import.meta.url but not for process.argv[1]; the entry check must still match.
+    const dir = mkdtempSync(join(tmpdir(), "mint-link-"));
+    mkdirSync(join(dir, "..data"));
+    copyFileSync(
+      new URL("./mint-token.mjs", import.meta.url),
+      join(dir, "..data", "mint-token.mjs")
+    );
+    symlinkSync(join("..data", "mint-token.mjs"), join(dir, "mint-token.mjs"));
+    const r = spawnSync(process.execPath, [join(dir, "mint-token.mjs")], {
+      env: {},
+      encoding: "utf8",
+    });
+    // Without configuration main() must run and fail loudly, not exit 0 in silence.
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("Could not mint the GitHub App installation token");
   });
 });
