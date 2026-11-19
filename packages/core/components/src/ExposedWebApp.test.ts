@@ -54,6 +54,28 @@ beforeAll(async () => {
     port: 8080,
     auth: AuthType.OAUTH2_PROXY,
   });
+  // Zitadel v4: the Login V2 is its own service at /ui/v2/login on the core's host.
+  const login = { pathPrefix: "/ui/v2/login", serviceName: "zitadel-login", servicePort: 3000 };
+  new ExposedWebApp("paths", {
+    image: "ghcr.io/zitadel/zitadel:v4.20.3",
+    domain: "paths.example.org",
+    port: 8080,
+    extraRoutes: [login],
+  });
+  new ExposedWebApp("paths-forward", {
+    image: "ghcr.io/zitadel/zitadel:v4.20.3",
+    domain: "paths-forward.example.org",
+    port: 8080,
+    auth: AuthType.FORWARD,
+    extraRoutes: [login],
+  });
+  new ExposedWebApp("paths-oauth", {
+    image: "ghcr.io/zitadel/zitadel:v4.20.3",
+    domain: "paths-oauth.example.org",
+    port: 8080,
+    auth: AuthType.OAUTH2_PROXY,
+    extraRoutes: [login, { ...login, pathPrefix: "/grpc", backendProtocol: "h2c" }],
+  });
   await new Promise((r) => setTimeout(r, 200));
 });
 
@@ -132,4 +154,104 @@ describe("ExposedWebApp backend protocol", () => {
     expect(servicePorts("grpc-oauth")[0].appProtocol).toBe("kubernetes.io/h2c");
     expect(appRouteServices("grpc-oauth")[0].scheme).toBe("h2c");
   });
+});
+
+describe("ExposedWebApp extra routes (path prefixes to other services)", () => {
+  type Rule = { matches: unknown[]; backendRefs: unknown[]; filters?: unknown[] };
+  const httpRoute = (name: string) =>
+    created.find((c) => c.name === `${name}-httproute`)?.inputs.spec as {
+      hostnames: string[];
+      rules: Rule[];
+    };
+  const appRoutes = (name: string) =>
+    (
+      created.find((c) => c.name === `${name}-oauth2-app-route`)?.inputs.spec as {
+        routes: unknown[];
+      }
+    ).routes;
+  const appRule = {
+    matches: [{ path: { type: "PathPrefix", value: "/" } }],
+    backendRefs: [{ name: "paths", port: 80 }],
+  };
+
+  it("renders the HTTPRoute unchanged unless asked", () => {
+    expect(httpRoute("demo")).toEqual({
+      parentRefs: [{ name: "homelab-gateway", namespace: "traefik-system" }],
+      hostnames: ["demo.example.org"],
+      rules: [
+        {
+          matches: [{ path: { type: "PathPrefix", value: "/" } }],
+          backendRefs: [{ name: "demo", port: 80 }],
+        },
+      ],
+    });
+  });
+
+  it("renders the OAuth2 IngressRoute unchanged unless asked", () => {
+    expect(appRoutes("plain-oauth")).toEqual([
+      {
+        match: "Host(`plain-oauth.example.org`)",
+        kind: "Rule",
+        middlewares: [{ name: "plain-oauth-oauth2-chain", namespace: "plain-oauth" }],
+        services: [{ name: "plain-oauth", port: 80 }],
+        priority: 1,
+      },
+    ]);
+  });
+
+  it("routes a path prefix to another service in an HTTPRoute rule before the app's rule", () => {
+    // Gateway API: the longest PathPrefix wins across rules, so /ui/v2/login beats /.
+    expect(httpRoute("paths").rules).toEqual([
+      {
+        matches: [{ path: { type: "PathPrefix", value: "/ui/v2/login" } }],
+        backendRefs: [{ name: "zitadel-login", port: 3000 }],
+      },
+      appRule,
+    ]);
+  });
+
+  it("puts the extra paths behind the same Authelia filters as the app", () => {
+    const rules = httpRoute("paths-forward").rules;
+    expect(rules).toHaveLength(2);
+    expect(rules[0].filters).toBeDefined();
+    expect(rules[0].filters).toEqual(rules[1].filters);
+  });
+
+  it("adds IngressRoute routes behind the same OAuth2 chain, above the catch-all", () => {
+    const routes = appRoutes("paths-oauth");
+    const chain = [{ name: "paths-oauth-oauth2-chain", namespace: "paths-oauth" }];
+    expect(routes).toHaveLength(3);
+    // No explicit priority: Traefik's default is the rule's length, which is always above the
+    // catch-all's priority 1 and lets the longest prefix win among extra routes.
+    expect(routes.slice(1)).toEqual([
+      {
+        match: "Host(`paths-oauth.example.org`) && PathPrefix(`/ui/v2/login`)",
+        kind: "Rule",
+        middlewares: chain,
+        services: [{ name: "zitadel-login", port: 3000 }],
+      },
+      {
+        match: "Host(`paths-oauth.example.org`) && PathPrefix(`/grpc`)",
+        kind: "Rule",
+        middlewares: chain,
+        services: [{ name: "zitadel-login", port: 3000, scheme: "h2c" }],
+      },
+    ]);
+  });
+
+  it.each(["ui/v2/login", "/", "/ui/*", "", "/ui//login"])(
+    "refuses the path prefix %j",
+    async (pathPrefix) => {
+      const { ExposedWebApp } = await import("./ExposedWebApp");
+      expect(
+        () =>
+          new ExposedWebApp(`bad-${pathPrefix.length}`, {
+            image: "nginxinc/nginx-unprivileged:alpine",
+            domain: "bad.example.org",
+            port: 8080,
+            extraRoutes: [{ pathPrefix, serviceName: "other", servicePort: 80 }],
+          })
+      ).toThrow(/pathPrefix/);
+    }
+  );
 });
