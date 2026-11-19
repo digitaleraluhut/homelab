@@ -147,3 +147,15 @@ describe("renovate CronJob: pod security restricted", () => {
     expect(labels["pod-security.kubernetes.io/enforce"]).toBe("restricted");
   });
 });
+
+describe("memory for large repositories", () => {
+  it("gives Node a heap that fits homelab-apps, below the container limit", () => {
+    // 2026-11-19: with a 2Gi limit Node aborted on its own heap limit in homelab-apps (exit 134).
+    const c = renovate() as unknown as {
+      env: Array<{ name: string; value?: string }>;
+      resources: { limits: { memory: string } };
+    };
+    expect(c.env.find((e) => e.name === "NODE_OPTIONS")?.value).toBe("--max-old-space-size=3072");
+    expect(c.resources.limits.memory).toBe("4Gi");
+  });
+});

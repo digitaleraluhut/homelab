@@ -185,6 +185,9 @@ export function createRenovate(args: RenovateArgs, opts?: pulumi.ResourceOptions
                       { name: "RENOVATE_CONFIG_FILE", value: `${CONFIG_DIR}/config.js` },
                       { name: "RENOVATE_TOKEN_FILE", value: `${TOKEN_DIR}/token` },
                       { name: "LOG_LEVEL", value: "info" },
+                      // Node's default heap (derived from the container limit) was too small for
+                      // homelab-apps' workspaces and lockfile: exit 134 "heap out of memory" (2026-11-19).
+                      { name: "NODE_OPTIONS", value: "--max-old-space-size=3072" },
                     ],
                     volumeMounts: [
                       { name: "token", mountPath: TOKEN_DIR, readOnly: true },
@@ -195,7 +198,7 @@ export function createRenovate(args: RenovateArgs, opts?: pulumi.ResourceOptions
                     securityContext: { ...restricted, readOnlyRootFilesystem: false },
                     resources: {
                       requests: { cpu: "100m", memory: "512Mi" },
-                      limits: { memory: "2Gi" },
+                      limits: { memory: "4Gi" },
                     },
                   },
                 ],
