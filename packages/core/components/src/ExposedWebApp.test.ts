@@ -34,6 +34,7 @@ beforeAll(async () => {
     domain: "single-writer.example.org",
     port: 8080,
     strategy: "Recreate",
+    enableServiceLinks: false,
   });
   new ExposedWebApp("grpc", {
     image: "ghcr.io/zitadel/zitadel:v4.20.3",
@@ -254,4 +255,25 @@ describe("ExposedWebApp extra routes (path prefixes to other services)", () => {
       ).toThrow(/pathPrefix/);
     }
   );
+});
+
+describe("ExposedWebApp service links", () => {
+  type Pod = { enableServiceLinks?: boolean };
+  const pod = (name: string) =>
+    (
+      created.find(
+        (c) => c.type === "kubernetes:apps/v1:Deployment" && c.name === `${name}-deployment`
+      )?.inputs.spec as { template: { spec: Pod } } | undefined
+    )?.template.spec;
+
+  it("keeps Kubernetes' default (service links on) unless asked", () => {
+    expect(pod("demo")).toBeDefined();
+    expect(pod("demo")?.enableServiceLinks).toBeUndefined();
+  });
+
+  it("turns service links off when asked", () => {
+    // Apps that read every prefixed variable (Zitadel: ZITADEL_*) misread injected service-link
+    // variables such as ZITADEL_PORT=tcp://… for a Service named like the app.
+    expect(pod("single-writer")?.enableServiceLinks).toBe(false);
+  });
 });

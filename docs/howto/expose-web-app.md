@@ -178,6 +178,9 @@ homelab.createExposedWebApp("my-app", {
   // Stop the old pod before starting the new one (single-writer apps, ReadWriteOnce volumes)
   strategy: "Recreate",
 
+  // No service-link variables (<SERVICE>_PORT=tcp://…) for apps that read every prefixed variable
+  enableServiceLinks: false,
+
   // HTTP/2 without TLS (h2c) from Traefik to the pod, e.g. gRPC or Zitadel (see below)
   backendProtocol: "h2c",
 
@@ -236,7 +239,7 @@ Some apps need HTTP/2 between the proxy and the pod, for example gRPC services o
 | HTTPRoute (`AuthType.NONE`, `AuthType.FORWARD`) | `appProtocol: kubernetes.io/h2c` on the Service port | Gateway API provider, **from Traefik v3.2** |
 | IngressRoute (`AuthType.OAUTH2_PROXY`) | `scheme: h2c` on the app's IngressRoute service (and the Service's `appProtocol`) | Kubernetes CRD provider (v3.1 too) |
 
-> **Traefik version.** The cluster runs Traefik v3.1.5 (chart 32.1.0, `packages/core/infrastructure/src/traefik-gateway`). Its Gateway API provider ignores `appProtocol` and talks HTTP/1.1 to every HTTPRoute backend. The provider reads `kubernetes.io/h2c` only from Traefik v3.2.0 on (`getProtocol` in `pkg/provider/kubernetes/gateway/httproute.go`). Until Traefik is upgraded, h2c works only with `AuthType.OAUTH2_PROXY`.
+> **Traefik version.** The cluster runs Traefik v3.7.16 (chart 42.2.0, `packages/core/infrastructure/src/traefik-gateway`, homelab#157). Its Gateway API provider reads `kubernetes.io/h2c` from the Service port (since v3.2.0, `pkg/provider/kubernetes/gateway/httproute.go`); verified end to end with Zitadel (homelab#154).
 
 ## Path prefixes to other services (`extraRoutes`)
 

@@ -200,6 +200,14 @@ export interface ExposedWebAppArgs {
    * lock in it (Gitea's queue database fails with "unable to lock level db" during a rollout).
    */
   strategy?: "RollingUpdate" | "Recreate";
+
+  /**
+   * Kubernetes injects environment variables for every Service in the namespace (service links,
+   * e.g. `<SERVICE>_PORT=tcp://…`). Set `false` for apps that read every variable with their
+   * prefix as configuration (Zitadel: a Service `zitadel` yields ZITADEL_PORT, which it misreads).
+   * Unset keeps Kubernetes' default (on).
+   */
+  enableServiceLinks?: boolean;
   /**
    * Protocol between Traefik and the pod. Default `"http"` (HTTP/1.1).
    * `"h2c"` (HTTP/2 without TLS) is for apps that need HTTP/2 to the backend, e.g. gRPC or
@@ -598,6 +606,9 @@ export class ExposedWebApp extends pulumi.ComponentResource {
               },
             },
             spec: {
+              ...(args.enableServiceLinks !== undefined
+                ? { enableServiceLinks: args.enableServiceLinks }
+                : {}),
               serviceAccountName: args.serviceAccountName,
               imagePullSecrets: args.imagePullSecrets,
               nodeSelector: args.nodeSelector,
