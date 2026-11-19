@@ -7,7 +7,7 @@
 // GITHUB_REPOSITORIES (comma-separated names, the token is limited to them), TOKEN_FILE,
 // optional GITHUB_API_URL. Neither the private key nor the token is ever logged.
 import { createSign } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { realpathSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 const b64url = (data) => Buffer.from(data).toString("base64url");
@@ -90,6 +90,8 @@ export async function main(env = process.env, fetchImpl = fetch) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Kubernetes mounts ConfigMap files as symlinks (mint-token.mjs -> ..data/mint-token.mjs). Node resolves
+// the symlink for import.meta.url but not for process.argv[1], so compare with the resolved path.
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   process.exitCode = await main();
 }
