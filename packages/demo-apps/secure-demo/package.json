@@ -14,7 +14,7 @@
     "@pulumi/pulumi": "^3.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "typescript": "^7.0.0"
   },
   "repository": {
     "type": "git",
