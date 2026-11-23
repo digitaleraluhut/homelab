@@ -24,7 +24,7 @@ jobs:
       run:
         working-directory: host
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # Same ansible-core line as Ubuntu 24.04's apt package on the host.
       - name: Install ansible-core and ansible-lint
