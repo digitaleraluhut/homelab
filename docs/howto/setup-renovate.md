@@ -1,6 +1,6 @@
 # Set up self-hosted Renovate
 
-Decision and rules: issue #100. Renovate runs as a nightly CronJob (`renovate` namespace),
+Decision and rules: issue #100. Renovate runs as a CronJob every 30 minutes (`renovate` namespace, schedule in `src/index.ts`),
 defined in `packages/core/infrastructure/src/renovate/`. Behaviour is in `renovate.json`
 per repository.
 

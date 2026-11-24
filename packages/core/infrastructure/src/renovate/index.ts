@@ -4,7 +4,7 @@ import * as k8s from "@pulumi/kubernetes";
 import type * as pulumi from "@pulumi/pulumi";
 
 /**
- * Self-hosted Renovate (issue #100): a nightly CronJob with its own GitHub App.
+ * Self-hosted Renovate (issue #100): a CronJob with its own GitHub App (schedule set by the caller; default nightly).
  *
  * - The App credentials (app id, installation id, private key) come from Pulumi ESC through
  *   an ExternalSecret. Keys in ESC: renovate-app-id, renovate-installation-id,
