@@ -148,6 +148,8 @@ export const longhornUI = {
 // Inert until the App credentials exist in Pulumi ESC, see docs/howto/setup-renovate.md.
 import { createRenovate, externalSecretsOperator } from "@mrsimpson/homelab-core-infrastructure";
 
-// Every 30 minutes, so releases of our own app images are picked up quickly (owner, 2026-11-24); other
-// updates still follow the schedule of each repository's renovate.json (the shared preset: Saturday mornings).
+// The CronJob starts Renovate every 30 minutes for all repositories. What a run may do is decided per
+// repository by its renovate.json: our own app images (homelab-apps#114) and security updates at any time;
+// everything else only inside the shared preset's window (Saturday mornings), so between those windows a
+// run finds nothing to do for it (owner, 2026-11-24).
 export const renovate = createRenovate({ externalSecretsOperator, schedule: "*/30 * * * *" });
