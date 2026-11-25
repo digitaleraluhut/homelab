@@ -196,9 +196,18 @@ describe("ExposedWebApp extra routes (path prefixes to other services)", () => {
     );
     expect(created.some((c) => c.name === "plain-oauth-oauth2-errors")).toBe(false);
     // The chain keeps its name (apps reference it) and holds only the forwardAuth.
+    // The real scheme first (TLS ends at Cloudflare), so the return address is https.
     expect(mw("plain-oauth-oauth2-chain")?.chain.middlewares).toEqual([
+      { name: "plain-oauth-oauth2-https" },
       { name: "plain-oauth-oauth2-forwardauth" },
     ]);
+    expect(
+      (
+        created.find((c) => c.name === "plain-oauth-oauth2-https")?.inputs.spec as {
+          headers: unknown;
+        }
+      ).headers
+    ).toEqual({ customRequestHeaders: { "X-Forwarded-Proto": "https" } });
   });
 
   it("renders the OAuth2 IngressRoute unchanged unless asked", () => {
