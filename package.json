@@ -10,6 +10,7 @@
     "format": "biome format --write packages src",
     "build": "npm run build --workspaces",
     "type-check": "npm run build && tsc --noEmit",
+    "pretest": "npm run build -w @mrsimpson/homelab-core-components",
     "test": "vitest run",
     "preview": "pulumi preview",
     "up": "pulumi up",

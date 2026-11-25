@@ -9,7 +9,9 @@
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
     "format": "biome format --write src/",
+    "pretype-check": "npm run build -w @mrsimpson/homelab-core-components",
     "type-check": "tsc --noEmit",
+    "pretest": "npm run build -w @mrsimpson/homelab-core-components",
     "test": "vitest run"
   },
   "keywords": [
