@@ -70,7 +70,10 @@ for (const [group, config] of Object.entries(groups)) {
       values: {
         config: {
           existingSecret: secretName,
-          configFile: `upstreams = [ "file:///dev/null" ]`,
+          // Static upstream (homelab#177): the proxy's root answers 202 for a session and 302 to the
+          // sign-in without one, so Traefik's forwardAuth can point at "/" without an errors middleware.
+          // /oauth2/auth keeps answering 401 for callers that still use it.
+          configFile: `upstreams = [ "static://202" ]`,
         },
         extraArgs: buildHelmExtraArgs(group, config, domain),
         authenticatedEmailsFile: {

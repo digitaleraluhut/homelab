@@ -61,9 +61,9 @@ import * as pulumi from "@pulumi/pulumi";
  *
  * When `auth` is `AuthType.OAUTH2_PROXY`, three Traefik middlewares are created in the
  * app's namespace with deterministic names:
- * - `<name>-oauth2-forwardauth` — ForwardAuth check against oauth2-proxy
- * - `<name>-oauth2-errors` — 401 → redirect to sign-in
- * - `<name>-oauth2-chain` — chains errors + forwardauth
+ * - `<name>-oauth2-forwardauth` — ForwardAuth against the oauth2-proxy root (static upstream: 202 with a
+ *   session, 302 to the sign-in without one; the app's own 401s pass through)
+ * - `<name>-oauth2-chain` — the chain apps reference; holds the forwardauth
  *
  * Apps that need **additional IngressRoutes** (e.g. wildcard subdomain routes) can
  * reference the chain middleware by name to share the same auth flow:
@@ -677,9 +677,13 @@ export class ExposedWebApp extends pulumi.ComponentResource {
       // --- OAuth2-Proxy: IngressRoute-based routing ---
       const oauth2Group = args.oauth2Proxy?.group || "users";
       const oauth2Namespace = args.oauth2Proxy?.namespace || "oauth2-proxy";
-      const oauth2ProxyServiceAddress = `http://oauth2-proxy-${oauth2Group}.${oauth2Namespace}.svc.cluster.local/oauth2/auth`;
+      // The proxy's root, served by its static upstream (homelab#177): 202 with a session, otherwise a
+      // 302 to the sign-in, built from the X-Forwarded-* headers. No errors middleware is needed, so the
+      // app's own 401s (e.g. a Basic auth challenge) reach the browser unchanged.
+      // Source: oauth2-proxy docs, configuration/integrations/traefik.md, "ForwardAuth with static upstreams".
+      const oauth2ProxyServiceAddress = `http://oauth2-proxy-${oauth2Group}.${oauth2Namespace}.svc.cluster.local/`;
 
-      // ForwardAuth middleware - checks session via /oauth2/auth
+      // ForwardAuth middleware - checks the session and redirects to the sign-in without one
       this.forwardAuthMiddleware = new k8s.apiextensions.CustomResource(
         `${name}-oauth2-forwardauth`,
         {
@@ -708,36 +712,8 @@ export class ExposedWebApp extends pulumi.ComponentResource {
         { ...childOpts, dependsOn: [this.service] }
       );
 
-      // Use shared redirect service from oauth2-proxy namespace
-      // This eliminates per-app ConfigMap + Deployment + Service (3 resources saved!)
-
-      // Errors middleware - catches 401 and serves redirect page from shared service
-      const errorsMiddleware = new k8s.apiextensions.CustomResource(
-        `${name}-oauth2-errors`,
-        {
-          apiVersion: "traefik.io/v1alpha1",
-          kind: "Middleware",
-          metadata: {
-            name: `${name}-oauth2-errors`,
-            namespace: namespace.metadata.name,
-          },
-          spec: {
-            errors: {
-              status: ["401"],
-              service: {
-                // Use ExternalName service to reference shared redirect service in oauth2-proxy namespace
-                name: "oauth2-shared-redirect",
-                namespace: "oauth2-proxy",
-                port: 80,
-              },
-              query: "/?url={url}",
-            },
-          },
-        },
-        { ...childOpts, dependsOn: [this.service] }
-      );
-
-      // Chain middleware - errors wraps forwardauth
+      // Chain middleware: only the forwardAuth now; the name stays because apps reference it
+      // (e.g. opencode-router's session subdomains).
       const chainMiddleware = new k8s.apiextensions.CustomResource(
         `${name}-oauth2-chain`,
         {
@@ -749,16 +725,13 @@ export class ExposedWebApp extends pulumi.ComponentResource {
           },
           spec: {
             chain: {
-              middlewares: [
-                { name: `${name}-oauth2-errors` },
-                { name: `${name}-oauth2-forwardauth` },
-              ],
+              middlewares: [{ name: `${name}-oauth2-forwardauth` }],
             },
           },
         },
         {
           ...childOpts,
-          dependsOn: [errorsMiddleware, this.forwardAuthMiddleware],
+          dependsOn: [this.forwardAuthMiddleware],
         }
       );
 

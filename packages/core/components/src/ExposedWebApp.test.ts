@@ -188,6 +188,19 @@ describe("ExposedWebApp extra routes (path prefixes to other services)", () => {
     });
   });
 
+  it("checks OAuth2 sessions at the proxy root, without an errors middleware (homelab#177)", () => {
+    type Spec = { forwardAuth: { address: string }; chain: { middlewares: unknown[] } };
+    const mw = (n: string) => created.find((c) => c.name === n)?.inputs.spec as Spec | undefined;
+    expect(mw("plain-oauth-oauth2-forwardauth")?.forwardAuth.address).toBe(
+      "http://oauth2-proxy-users.oauth2-proxy.svc.cluster.local/"
+    );
+    expect(created.some((c) => c.name === "plain-oauth-oauth2-errors")).toBe(false);
+    // The chain keeps its name (apps reference it) and holds only the forwardAuth.
+    expect(mw("plain-oauth-oauth2-chain")?.chain.middlewares).toEqual([
+      { name: "plain-oauth-oauth2-forwardauth" },
+    ]);
+  });
+
   it("renders the OAuth2 IngressRoute unchanged unless asked", () => {
     expect(appRoutes("plain-oauth")).toEqual([
       {
