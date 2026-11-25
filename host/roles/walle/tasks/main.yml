@@ -83,6 +83,25 @@
     group: "{{ walle_user }}"
     mode: "0644"
 
+# Wiki runbooks (written for the operator) set KUBECONFIG=~/.kube/config. For WALL-E that path is its
+# token-less proxy kubeconfig too, so a copied command reaches the cluster instead of failing.
+- name: Create WALL-E's ~/.kube
+  ansible.builtin.file:
+    path: "{{ walle_home }}/.kube"
+    state: directory
+    owner: root
+    group: "{{ walle_user }}"
+    mode: "0755"
+
+- name: Point WALL-E's ~/.kube/config at its proxy kubeconfig
+  ansible.builtin.file:
+    src: "{{ walle_kube_kubeconfig }}"
+    dest: "{{ walle_home }}/.kube/config"
+    state: link
+    force: true
+    owner: root
+    group: "{{ walle_user }}"
+
 - name: Create the directory for WALL-E's host helpers
   ansible.builtin.file:
     path: /usr/local/lib/walle
