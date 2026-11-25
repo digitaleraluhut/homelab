@@ -63,7 +63,8 @@ import * as pulumi from "@pulumi/pulumi";
  * app's namespace with deterministic names:
  * - `<name>-oauth2-forwardauth` — ForwardAuth against the oauth2-proxy root (static upstream: 202 with a
  *   session, 302 to the sign-in without one; the app's own 401s pass through)
- * - `<name>-oauth2-chain` — the chain apps reference; holds the forwardauth
+ * - `<name>-oauth2-https` — sets X-Forwarded-Proto: https (TLS ends at Cloudflare) for the return address
+ * - `<name>-oauth2-chain` — the chain apps reference; https, then forwardauth
  *
  * Apps that need **additional IngressRoutes** (e.g. wildcard subdomain routes) can
  * reference the chain middleware by name to share the same auth flow:
@@ -712,6 +713,26 @@ export class ExposedWebApp extends pulumi.ComponentResource {
         { ...childOpts, dependsOn: [this.service] }
       );
 
+      // Public traffic is HTTPS (Cloudflare terminates TLS); it reaches Traefik's "web" entry point as HTTP,
+      // which sets X-Forwarded-Proto: http. oauth2-proxy builds the return address after sign-in from
+      // X-Forwarded-*, and an http:// address would lose the secure session cookie (a sign-in loop). The
+      // forwardAuth trusts forwarded headers, so this middleware sets the real scheme before it.
+      const httpsMiddleware = new k8s.apiextensions.CustomResource(
+        `${name}-oauth2-https`,
+        {
+          apiVersion: "traefik.io/v1alpha1",
+          kind: "Middleware",
+          metadata: {
+            name: `${name}-oauth2-https`,
+            namespace: namespace.metadata.name,
+          },
+          spec: {
+            headers: { customRequestHeaders: { "X-Forwarded-Proto": "https" } },
+          },
+        },
+        { ...childOpts, dependsOn: [this.service] }
+      );
+
       // Chain middleware: only the forwardAuth now; the name stays because apps reference it
       // (e.g. opencode-router's session subdomains).
       const chainMiddleware = new k8s.apiextensions.CustomResource(
@@ -725,13 +746,16 @@ export class ExposedWebApp extends pulumi.ComponentResource {
           },
           spec: {
             chain: {
-              middlewares: [{ name: `${name}-oauth2-forwardauth` }],
+              middlewares: [
+                { name: `${name}-oauth2-https` },
+                { name: `${name}-oauth2-forwardauth` },
+              ],
             },
           },
         },
         {
           ...childOpts,
-          dependsOn: [this.forwardAuthMiddleware],
+          dependsOn: [httpsMiddleware, this.forwardAuthMiddleware],
         }
       );
 
