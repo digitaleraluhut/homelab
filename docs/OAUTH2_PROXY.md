@@ -21,8 +21,7 @@ Kubernetes Cluster
 │   ├── oauth2-emails-{group} ConfigMaps (per-group email allowlists)
 │   ├── oauth2-proxy-{group} Deployments (one per group)
 │   ├── oauth2-proxy-{group} Services (one per group)
-│   ├── oauth2-shared-redirect (SHARED: ConfigMap + Deployment + Service)
-│   │   └── Single nginx instance serves all apps (30% resource reduction)
+│   ├── oauth2-shared-redirect (only for apps built before homelab#177; to be removed)
 │   └── oauth2-callback HTTPRoute (GitHub redirect endpoint)
 │
 ├── authelia namespace (unchanged)
@@ -30,13 +29,13 @@ Kubernetes Cluster
 │
 └── app namespaces (e.g., oauth2-demo)
     ├── App Deployment & Service
-    ├── oauth2-forwardauth Middleware (ForwardAuth to oauth2-proxy)
-    ├── oauth2-errors Middleware (catches 401 → shared redirect service)
-    ├── oauth2-chain Middleware (combines errors + forwardauth)
+    ├── oauth2-forwardauth Middleware (ForwardAuth to the oauth2-proxy root: 202 with a session,
+    │                                  302 to the sign-in without one; homelab#177)
+    ├── oauth2-chain Middleware (the name apps reference; holds the forwardauth)
     └── IngressRoutes (protected app + /oauth2/* endpoints)
 ```
 
-**Key Optimization**: The redirect service is **shared across all apps** in the `oauth2-proxy` namespace, eliminating 3 Kubernetes resources (ConfigMap, Deployment, Service) per app.
+**Since homelab#177** the proxies run with a static upstream (`static://202`, oauth2-proxy's "ForwardAuth with static upstreams" mode), so no errors middleware catches 401s any more: an app's own 401 (e.g. opencode's Basic auth challenge) reaches the browser, and the return address after sign-in comes from the `X-Forwarded-*` headers.
 
 ### Authentication Flow
 
