@@ -33,7 +33,7 @@ const APP_USERNAME = "digitaleraluhut-renovate[bot]";
 // One image for both containers: the init container needs only Node, which this image has.
 // renovate: image
 const IMAGE =
-  "renovate/renovate:41.173.1@sha256:e998e1218fe572e23278d8808186a310784f7cb2ac8055307183ffc51d3a59e5";
+  "renovate/renovate:45.4.0@sha256:fee4fdbe137e25cfaa5f4a53f6be4869afae9fd6e32dc94c8855554d8f020f89";
 // The image's own non-root user (containerbase `ubuntu`); its HOME belongs to it.
 const IMAGE_UID = 12021;
 const TOKEN_DIR = "/run/renovate-token";
